@@ -1,9 +1,17 @@
 #include "IO.h"
+#ifdef _WIN32
 #include <Windows.h>
+#endif
+#ifdef __APPLE__
+#include <AppKit/AppKit.h>
+#endif
 #include <algorithm>
 #include <zlib.h>
 #include <sstream>
 #include <cassert>
+#include <cctype>
+#include <codecvt>
+#include <locale>
 
 #undef min
 #undef max
@@ -12,6 +20,7 @@ namespace IO
 {
 	MessageBoxResult messageBox(std::string title, std::string message, MessageBoxButtons buttons, MessageBoxIcon icon, void* parentWindow)
 	{
+#ifdef _WIN32
 		UINT flags = 0;
 		switch (icon)
 		{
@@ -42,6 +51,58 @@ namespace IO
 		case IDOK:		return MessageBoxResult::Ok;
 		default:		return MessageBoxResult::None;
 		}
+#elif defined(__APPLE__)
+		@autoreleasepool
+		{
+			NSAlert* alert = [[NSAlert alloc] init];
+			[alert setMessageText:[NSString stringWithUTF8String:title.c_str()] ?: @""];
+			[alert setInformativeText:[NSString stringWithUTF8String:message.c_str()] ?: @""];
+
+			switch (icon)
+			{
+			case MessageBoxIcon::Warning: [alert setAlertStyle:NSAlertStyleWarning]; break;
+			case MessageBoxIcon::Error: [alert setAlertStyle:NSAlertStyleCritical]; break;
+			default: [alert setAlertStyle:NSAlertStyleInformational]; break;
+			}
+
+			switch (buttons)
+			{
+			case MessageBoxButtons::OkCancel:
+				[alert addButtonWithTitle:@"OK"];
+				[alert addButtonWithTitle:@"Cancel"];
+				break;
+			case MessageBoxButtons::YesNo:
+				[alert addButtonWithTitle:@"Yes"];
+				[alert addButtonWithTitle:@"No"];
+				break;
+			case MessageBoxButtons::YesNoCancel:
+				[alert addButtonWithTitle:@"Yes"];
+				[alert addButtonWithTitle:@"No"];
+				[alert addButtonWithTitle:@"Cancel"];
+				break;
+			case MessageBoxButtons::Ok:
+			default:
+				[alert addButtonWithTitle:@"OK"];
+				break;
+			}
+
+			const NSModalResponse response = [alert runModal];
+			const NSInteger buttonIndex = response - NSAlertFirstButtonReturn;
+			if (buttons == MessageBoxButtons::YesNo || buttons == MessageBoxButtons::YesNoCancel)
+			{
+				if (buttonIndex == 0) return MessageBoxResult::Yes;
+				if (buttonIndex == 1) return MessageBoxResult::No;
+				if (buttonIndex == 2) return MessageBoxResult::Cancel;
+			}
+			else if (buttons == MessageBoxButtons::OkCancel && buttonIndex == 1)
+			{
+				return MessageBoxResult::Cancel;
+			}
+			return MessageBoxResult::Ok;
+		}
+#else
+		return MessageBoxResult::Ok;
+#endif
 	}
 
 	char* reverse(char* str)
@@ -112,7 +173,7 @@ namespace IO
 		if (str.empty())
 			return false;
 
-		return std::all_of(str.begin() + (str.at(0) == '-' ? 1 : 0), str.end(), std::isdigit);
+		return std::all_of(str.begin() + (str.at(0) == '-' ? 1 : 0), str.end(), [](unsigned char c) { return std::isdigit(c); });
 	}
 
 	std::string trim(const std::string& line)
@@ -120,8 +181,11 @@ namespace IO
 		if (line.empty())
 			return line;
 
-		size_t start = line.find_first_not_of(" ");
-		size_t end = line.find_last_not_of(" ");
+		size_t start = line.find_first_not_of(" \t\r\n");
+		if (start == std::string::npos)
+			return "";
+
+		size_t end = line.find_last_not_of(" \t\r\n");
 
 		return line.substr(start, end - start + 1);
 	}
@@ -145,20 +209,36 @@ namespace IO
 
 	std::string wideStringToMb(const std::wstring& str)
 	{
+#ifdef _WIN32
+		if (str.empty())
+			return {};
+
 		int size = WideCharToMultiByte(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0, NULL, NULL);
 		std::string result(size, 0);
 		WideCharToMultiByte(CP_UTF8, 0, &str[0], (int)str.size(), &result[0], size, NULL, NULL);
 
 		return result;
+#else
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+		return converter.to_bytes(str);
+#endif
 	}
 
 	std::wstring mbToWideStr(const std::string& str)
 	{
+#ifdef _WIN32
+		if (str.empty())
+			return {};
+
 		int size = MultiByteToWideChar(CP_UTF8, 0, &str[0], str.size(), NULL, 0);
 		std::wstring wResult(size, 0);
 		MultiByteToWideChar(CP_UTF8, 0, &str[0], str.size(), &wResult[0], size);
 
 		return wResult;
+#else
+		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+		return converter.from_bytes(str);
+#endif
 	}
 
 	std::string concat(const char* s1, const char* s2, const char* join)

@@ -54,7 +54,7 @@ namespace IO
 		std::string openFilename{};
 		std::wstring openFilenameW{};
 
-		int getStreamMode(FileMode) const;
+		std::ios_base::openmode getStreamMode(FileMode) const;
 	};
 
 	enum class FileDialogResult : uint8_t

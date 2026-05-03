@@ -121,7 +121,12 @@ namespace MikuMikuWorld
 		);
 	}
 
-	PresetManager::PresetManager(const std::string& path) : presetsPath{ IO::mbToWideStr(path) }
+	PresetManager::PresetManager(const std::string& path) :
+#ifdef _WIN32
+		presetsPath{ IO::mbToWideStr(path) }
+#else
+		presetsPath{ path }
+#endif
 	{
 		fs::create_directory(presetsPath);
 	}
@@ -135,8 +140,13 @@ namespace MikuMikuWorld
 		for (const auto& file : std::filesystem::directory_iterator(presetsPath))
 		{
 			// Ignore dot files
-			if (file.path().extension().wstring() == L".json" && file.path().wstring().at(0) != L'.')
+#ifdef _WIN32
+			if (file.path().extension().wstring() == L".json" && file.path().filename().wstring().at(0) != L'.')
 				filenames.push_back(IO::wideStringToMb(file.path().wstring()));
+#else
+			if (file.path().extension().string() == ".json" && file.path().filename().string().at(0) != '.')
+				filenames.push_back(file.path().string());
+#endif
 		}
 
 		std::mutex m2;		
@@ -144,7 +154,7 @@ namespace MikuMikuWorld
 		std::vector<Result> warnings;
 		std::vector<Result> errors;
 
-		std::for_each(std::execution::seq, filenames.begin(), filenames.end(),
+		std::for_each(filenames.begin(), filenames.end(),
 			[this, &warnings, &errors, &m2](const auto& filename) {
 
 				int id = nextPresetID++;
@@ -255,7 +265,11 @@ namespace MikuMikuWorld
 		if (fs::exists(presetsPath) || fs::create_directory(presetsPath))
 		{
 			// Extension is added after determining final file name
+#ifdef _WIN32
 			preset.write(presetsPath / IO::mbToWideStr(fixFilename(preset.getName())), false);
+#else
+			preset.write(presetsPath / fixFilename(preset.getName()), false);
+#endif
 			return true;
 		}
 
@@ -286,7 +300,11 @@ namespace MikuMikuWorld
 			deletePresetFuture = std::async(std::launch::async, [this, preset]() -> bool
 			{
 				deletedPreset = std::move(preset);
+#ifdef _WIN32
 				return fs::remove(presetsPath / IO::mbToWideStr(deletedPreset.getFilename()));
+#else
+				return fs::remove(presetsPath / deletedPreset.getFilename());
+#endif
 			});
 
 			presets.erase(presets.begin() + index);
@@ -303,7 +321,11 @@ namespace MikuMikuWorld
 		{
 			try
 			{
+#ifdef _WIN32
 				deletedPreset.write(presetsPath / IO::mbToWideStr(deletedPreset.getFilename()), false);
+#else
+				deletedPreset.write(presetsPath / deletedPreset.getFilename(), false);
+#endif
 				presets.insert(presets.begin() + deletedPresetIndex, std::move(deletedPreset));
 
 				deletedPreset = {};

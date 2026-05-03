@@ -17,6 +17,17 @@ A chart editor and viewer for the mobile rhythm game Project Sekai Colorful Stag
 
 *Earlier versions of Windows may work but not tested.
 
+## Build from source:
+- Windows: open `MikuMikuWorld.sln` in Visual Studio and build the existing x64 configuration.
+- macOS: install Xcode Command Line Tools, then run:
+
+```sh
+cmake -S . -B build-macos -DCMAKE_BUILD_TYPE=Release
+cmake --build build-macos --config Release
+```
+
+The macOS build produces `build-macos/MikuMikuWorld.app`. CMake will use an installed GLFW package if one is available; otherwise it fetches GLFW during configure.
+
 ## Download:
 The latest version can be downloaded [here](https://github.com/crash5band/MikuMikuWorld/releases/latest/download/MikuMikuWorld.zip).
 

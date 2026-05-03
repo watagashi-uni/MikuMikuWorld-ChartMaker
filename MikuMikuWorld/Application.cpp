@@ -6,13 +6,50 @@
 #include "ApplicationConfiguration.h"
 #include "ScoreSerializer.h"
 #include "NoteSkin.h"
+#include <cstdlib>
+#include <filesystem>
 
 namespace MikuMikuWorld
 {
+#ifndef MIKUMIKUWORLD_VERSION
+#define MIKUMIKUWORLD_VERSION "1.0.0"
+#endif
+
 	std::string Application::version{ "1.0.0" };
 	std::string Application::appDir{ "" };
+	static std::string userDataDir{ "" };
 	std::string Application::pendingLoadScoreFile{ "" };
 	WindowState Application::windowState{};
+
+	namespace
+	{
+		std::string ensureTrailingSlash(std::string path)
+		{
+			if (!path.empty() && path.back() != '/')
+				path.push_back('/');
+
+			return path;
+		}
+
+		std::string resolveUserDataDir(const std::string& resourceDir)
+		{
+#ifdef __APPLE__
+			const char* homeDir = std::getenv("HOME");
+			if (homeDir && *homeDir)
+				return ensureTrailingSlash(std::string(homeDir) + "/Library/Application Support/MikuMikuWorld");
+#endif
+			return resourceDir;
+		}
+
+		void ensureDirectoryExists(const std::string& path)
+		{
+			if (path.empty())
+				return;
+
+			std::error_code error;
+			std::filesystem::create_directories(path, error);
+		}
+	}
 
 	Application::Application() : 
 		initialized{ false }, language{ "" }
@@ -24,11 +61,18 @@ namespace MikuMikuWorld
 		if (initialized)
 			return Result(ResultStatus::Success, "App is already initialized");
 
-		appDir = root;
+		appDir = ensureTrailingSlash(root);
+		userDataDir = resolveUserDataDir(appDir);
+		ensureDirectoryExists(userDataDir);
 		version = getVersion();
 		language = "";
 
-		config.read(appDir + APP_CONFIG_FILENAME);
+		const std::string userConfigPath = userDataDir + APP_CONFIG_FILENAME;
+		const std::string bundledConfigPath = appDir + APP_CONFIG_FILENAME;
+		if (IO::File::exists(userConfigPath))
+			config.read(userConfigPath);
+		else
+			config.read(bundledConfigPath);
 		readSettings();
 
 		Result result = initOpenGL();
@@ -57,8 +101,14 @@ namespace MikuMikuWorld
 		return appDir;
 	}
 
+	const std::string& Application::getUserDataDir()
+	{
+		return userDataDir;
+	}
+
 	std::string Application::getVersion()
 	{
+#ifdef _WIN32
 		wchar_t filename[1024];
 		lstrcpyW(filename, IO::mbToWideStr(std::string(appDir + "MikuMikuWorld.exe")).c_str());
 
@@ -92,6 +142,9 @@ namespace MikuMikuWorld
 		}
 
 		return IO::formatString("%d.%d.%d", major, minor, rev);
+#else
+		return MIKUMIKUWORLD_VERSION;
+#endif
 	}
 
 	const std::string& Application::getAppVersion()
@@ -133,7 +186,7 @@ namespace MikuMikuWorld
 		if (editor)
 		{
 			editor->writeSettings();
-			config.write(appDir + APP_CONFIG_FILENAME);
+			config.write(userDataDir + APP_CONFIG_FILENAME);
 		}
 	}
 
@@ -189,6 +242,11 @@ namespace MikuMikuWorld
 		}
 
 		float dpiX = 1.0f, dpiY = 1.0f;
+#ifdef __APPLE__
+		// GLFW reports Retina backing scale here, but the current UI code already
+		// renders in logical points. Applying that scale again makes the macOS UI oversized.
+		float dpiScale = 1.0f;
+#else
 		GLFWmonitor* mainMonitor = glfwGetPrimaryMonitor();
 		if (mainMonitor)
 		{
@@ -196,6 +254,7 @@ namespace MikuMikuWorld
 		}
 
 		float dpiScale = (dpiX + dpiY) * 0.5f;
+#endif
 		if (dpiScale != windowState.lastDpiScale)
 		{
 			imgui->buildFonts(dpiScale);
@@ -332,34 +391,34 @@ namespace MikuMikuWorld
 
 	void Application::loadResources()
 	{
-		ResourceManager::loadShader(appDir + "res\\shaders\\basic2d");
-		ResourceManager::loadShader(appDir + "res\\shaders\\masking");
-		ResourceManager::loadShader(appDir + "res\\shaders\\particles");
+		ResourceManager::loadShader(appDir + "res/shaders/basic2d");
+		ResourceManager::loadShader(appDir + "res/shaders/masking");
+		ResourceManager::loadShader(appDir + "res/shaders/particles");
 
 		// TODO: Do not set the note skin texture indexes manually!
-		const std::string notes01TexDir = appDir + "res\\notes\\01\\";
+		const std::string notes01TexDir = appDir + "res/notes/01/";
 		ResourceManager::loadTexture(notes01TexDir + "notes.png");
 		ResourceManager::loadTexture(notes01TexDir + "longNoteLine.png");
 		ResourceManager::loadTexture(notes01TexDir + "touchLine_eff.png");
 		noteSkins.add("Notes 01", 0, 1, 2);
 
-		const std::string notes02TexDir = appDir + "res\\notes\\02\\";
+		const std::string notes02TexDir = appDir + "res/notes/02/";
 		ResourceManager::loadTexture(notes02TexDir + "notes.png");
 		ResourceManager::loadTexture(notes02TexDir + "longNoteLine.png");
 		ResourceManager::loadTexture(notes02TexDir + "touchLine_eff.png");
 		noteSkins.add("Notes 02", 3, 4, 5);
 
-		const std::string editorAssetsDir = appDir + "res\\editor\\";
+		const std::string editorAssetsDir = appDir + "res/editor/";
 		ResourceManager::loadTexture(editorAssetsDir + "timeline_tools.png");
 		ResourceManager::loadTexture(editorAssetsDir + "note_stats.png");
 		ResourceManager::loadTexture(editorAssetsDir + "stage.png");
 
-		ResourceManager::loadTransforms(appDir + "res\\effect\\transform.txt");
+		ResourceManager::loadTransforms(appDir + "res/effect/transform.txt");
 
 		// Load more languages here
 		Localization::loadDefault();
-		Localization::load("ja", u8"日本語", appDir + "res\\i18n\\ja.csv");
-		Localization::load("zh-tw", u8"繁體中文（台灣）", appDir + "res\\i18n\\zh-tw.csv");
+		Localization::load("ja", u8"日本語", appDir + "res/i18n/ja.csv");
+		Localization::load("zh-tw", u8"繁體中文（台灣）", appDir + "res/i18n/zh-tw.csv");
 	}
 
 	void Application::setFullScreen(bool fullScreen)
@@ -394,6 +453,7 @@ namespace MikuMikuWorld
 
 	void Application::run()
 	{
+#ifdef _WIN32
 		HWND hwnd = glfwGetWin32Window(window);
 
 		/*
@@ -410,6 +470,9 @@ namespace MikuMikuWorld
 			reinterpret_cast<UINT_PTR>(&windowState.windowTimerId), USER_TIMER_MINIMUM, nullptr);
 
 		::DragAcceptFiles(hwnd, TRUE);
+#else
+		windowState.windowHandle = nullptr;
+#endif
 
 		while (!glfwWindowShouldClose(window))
 		{

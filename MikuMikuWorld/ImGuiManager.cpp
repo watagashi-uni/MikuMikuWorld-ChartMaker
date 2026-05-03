@@ -24,7 +24,7 @@ namespace MikuMikuWorld
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 
-		configFilename = Application::getAppDir() + IMGUI_CONFIG_FILENAME;
+		configFilename = Application::getUserDataDir() + IMGUI_CONFIG_FILENAME;
 
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |=

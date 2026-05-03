@@ -8,7 +8,10 @@
 #include "NativeScoreSerializer.h"
 #include "ScoreSerializeWindow.h"
 #include <filesystem>
+#include <cstdlib>
+#ifdef _WIN32
 #include <Windows.h>
+#endif
 
 namespace MikuMikuWorld
 {
@@ -27,7 +30,7 @@ namespace MikuMikuWorld
 		&config.input.timelineHiSpeed
 	};
 
-	ScoreEditor::ScoreEditor() : presetManager(Application::getAppDir() + "library")
+	ScoreEditor::ScoreEditor() : presetManager(Application::getUserDataDir() + "library")
 	{
 		renderer = std::make_unique<Renderer>();
 
@@ -41,7 +44,7 @@ namespace MikuMikuWorld
 		timeline.setDivision(config.division);
 		timeline.setZoom(config.zoom);
 
-		autoSavePath = Application::getAppDir() + "auto_save";
+		autoSavePath = Application::getUserDataDir() + "auto_save";
 		autoSaveTimer.reset();
 
 		preview.loadNoteEffects(context.scorePreviewDrawData.effectView);
@@ -137,7 +140,7 @@ namespace MikuMikuWorld
 
 		if (settingsWindow.isBackgroundChangePending)
 		{
-			static const std::string defaultBackgroundPath = Application::getAppDir() + "res\\editor\\default.png";
+			static const std::string defaultBackgroundPath = Application::getAppDir() + "res/editor/default.png";
 			timeline.background.load(config.backgroundImage.empty() ? defaultBackgroundPath : config.backgroundImage);
 			settingsWindow.isBackgroundChangePending = false;
 		}
@@ -546,7 +549,12 @@ namespace MikuMikuWorld
 			{
 				if (!std::filesystem::exists(presetManager.getPresetsPath()))
 					std::filesystem::create_directory(presetManager.getPresetsPath());
-				ShellExecuteW(0, 0, presetManager.getPresetsPath().data(), 0, 0, SW_SHOW);
+#ifdef _WIN32
+				ShellExecuteW(0, 0, presetManager.getPresetsPath().c_str(), 0, 0, SW_SHOW);
+#elif defined(__APPLE__)
+				std::string command = "open \"" + presetManager.getPresetsPath().string() + "\"";
+				std::system(command.c_str());
+#endif
 			}
 			
 			ImGui::EndMenu();
@@ -697,19 +705,31 @@ namespace MikuMikuWorld
 
 	void ScoreEditor::help()
 	{
+#ifdef _WIN32
 		ShellExecuteW(0, 0, L"https://github.com/crash5band/MikuMikuWorld/wiki", 0, 0, SW_SHOW);
+#elif defined(__APPLE__)
+		std::system("open https://github.com/crash5band/MikuMikuWorld/wiki");
+#endif
 	}
 
 	void ScoreEditor::autoSave()
 	{
+#ifdef _WIN32
 		std::wstring wAutoSaveDir = IO::mbToWideStr(autoSavePath);
 		std::filesystem::create_directory(wAutoSaveDir);
+#else
+		std::filesystem::create_directory(autoSavePath);
+#endif
 
 		context.score.metadata = context.workingData.toScoreMetadata();
-		NativeScoreSerializer().serialize(context.score, autoSavePath + "\\mmw_auto_save_" + Utilities::getCurrentDateTime() + MMWS_EXTENSION);
+		NativeScoreSerializer().serialize(context.score, autoSavePath + "/mmw_auto_save_" + Utilities::getCurrentDateTime() + MMWS_EXTENSION);
 		
 		int mmwsCount = 0;
+#ifdef _WIN32
 		for (const auto& file : std::filesystem::directory_iterator(wAutoSaveDir))
+#else
+		for (const auto& file : std::filesystem::directory_iterator(autoSavePath))
+#endif
 		{
 			std::string extension = file.path().extension().string();
 			std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);

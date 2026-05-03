@@ -154,10 +154,16 @@ namespace Audio
 
 	void SoundPool::initialize(const std::string& path, ma_engine* engine, ma_sound_group* group, SoundFlags flags)
 	{
+#ifdef _WIN32
 		std::wstring wPath = IO::mbToWideStr(path);
+#endif
 		for (int i = 0; i < pool.size(); i++)
 		{
+#ifdef _WIN32
 			ma_result result = ma_sound_init_from_file_w(engine, wPath.c_str(), maSoundFlagsDecodeAsync, group, NULL, &pool[i].source);
+#else
+			ma_result result = ma_sound_init_from_file(engine, path.c_str(), maSoundFlagsDecodeAsync, group, NULL, &pool[i].source);
+#endif
 			if (flags & SoundFlags::LOOP)
 				ma_sound_set_looping(&pool[i].source, true);
 		}

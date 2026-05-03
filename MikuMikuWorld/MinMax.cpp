@@ -184,7 +184,7 @@ namespace MikuMikuWorld::Effect
 				lerp(min.a, max.a, lerpRatio)
 			);
 		case MinMaxColorMode::Random:
-			return gradientMin[std::clamp(static_cast<size_t>(gradientMin.size() * lerpRatio), 0ull, gradientMin.size() - 1)].color;
+			return gradientMin[std::clamp<size_t>(static_cast<size_t>(gradientMin.size() * lerpRatio), 0, gradientMin.size() - 1)].color;
 		case MinMaxColorMode::Gradient:
 			return at(gradientMin, time);
 		case MinMaxColorMode::TwoGradients:

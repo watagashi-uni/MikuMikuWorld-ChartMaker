@@ -1,5 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
+#ifdef _WIN32
 #define STBI_WINDOWS_UTF8
+#endif
 
 #include "Application.h"
 #include "ApplicationConfiguration.h"
@@ -93,10 +95,22 @@ namespace MikuMikuWorld
 		glfwSetFramebufferSizeCallback(window, frameBufferResizeCallback);
 		glfwSetWindowCloseCallback(window, windowCloseCallback);
 		glfwSetWindowMaximizeCallback(window, windowMaximizeCallback);
+#ifndef _WIN32
+		glfwSetWindowUserPointer(window, this);
+		glfwSetDropCallback(window, [](GLFWwindow* window, int count, const char** paths)
+		{
+			auto* app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			if (!app)
+				return;
+
+			for (int i = 0; i < count; ++i)
+				app->appendOpenFile(paths[i]);
+		});
+#endif
 
 		UI::setDarkMode(UI::isSystemDarkMode());
 
-		std::string iconFilename = appDir + "res\\mmw_icon.png";
+		std::string iconFilename = appDir + "res/mmw_icon.png";
 		if (IO::File::exists(iconFilename))
 		{
 			GLFWimage images[1]{};

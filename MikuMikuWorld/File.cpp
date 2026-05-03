@@ -1,6 +1,11 @@
 #include "File.h"
 #include "IO.h"
+#ifdef _WIN32
 #include <Windows.h>
+#endif
+#ifdef __APPLE__
+#include <AppKit/AppKit.h>
+#endif
 #include <algorithm>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,7 +40,7 @@ namespace IO
 			stream->close();
 	}
 
-	int File::getStreamMode(FileMode mode) const
+	std::ios_base::openmode File::getStreamMode(FileMode mode) const
 	{
 		switch (mode)
 		{
@@ -48,7 +53,7 @@ namespace IO
 		case FileMode::WriteBinary:
 			return std::fstream::out | std::fstream::binary;
 		default:
-			return 0;
+			return {};
 		}
 	}
 
@@ -61,7 +66,11 @@ namespace IO
 	void File::open(const std::wstring& filename, FileMode mode)
 	{
 		openFilenameW = filename;
+#ifdef _WIN32
 		stream->open(filename, getStreamMode(mode));
+#else
+		stream->open(wideStringToMb(filename), getStreamMode(mode));
+#endif
 	}
 
 	void File::close()
@@ -225,8 +234,12 @@ namespace IO
 
 	bool File::exists(const std::string& path)
 	{
+#ifdef _WIN32
 		std::wstring wPath = mbToWideStr(path);
 		return std::filesystem::exists(wPath);
+#else
+		return std::filesystem::exists(path);
+#endif
 	}
 
 	bool File::hasFileExtension(const std::string_view& filename, const std::string_view& extension)
@@ -236,6 +249,7 @@ namespace IO
 
 	FileDialogResult FileDialog::showFileDialog(DialogType type, DialogSelectType selectType)
 	{
+#ifdef _WIN32
 		std::wstring wTitle = mbToWideStr(title);
 
 		OPENFILENAMEW ofn;
@@ -309,6 +323,60 @@ namespace IO
 
 		filterIndex = ofn.nFilterIndex - 1;
 		return FileDialogResult::OK;
+#elif defined(__APPLE__)
+		@autoreleasepool
+		{
+			NSString* nsTitle = [NSString stringWithUTF8String:title.c_str()];
+			NSMutableArray<NSString*>* extensions = [NSMutableArray array];
+			for (const auto& filter : filters)
+			{
+				std::stringstream stream(filter.filterType);
+				std::string pattern;
+				while (std::getline(stream, pattern, ';'))
+				{
+					if (pattern == "*.*" || pattern == "*")
+						continue;
+
+					if (pattern.rfind("*.", 0) == 0)
+						pattern.erase(0, 2);
+					if (!pattern.empty())
+						[extensions addObject:[NSString stringWithUTF8String:pattern.c_str()]];
+				}
+			}
+
+			NSSavePanel* panel = nil;
+			if (type == DialogType::Save)
+			{
+				panel = [NSSavePanel savePanel];
+				if (!inputFilename.empty())
+					[panel setNameFieldStringValue:[NSString stringWithUTF8String:File::getFilename(inputFilename).c_str()]];
+			}
+			else
+			{
+				NSOpenPanel* openPanel = [NSOpenPanel openPanel];
+				[openPanel setCanChooseFiles:selectType == DialogSelectType::File];
+				[openPanel setCanChooseDirectories:selectType == DialogSelectType::Folder];
+				[openPanel setAllowsMultipleSelection:NO];
+				panel = openPanel;
+			}
+
+			[panel setTitle:nsTitle ?: @""];
+			if (extensions.count > 0)
+				[panel setAllowedFileTypes:extensions];
+
+			if ([panel runModal] != NSModalResponseOK)
+				return FileDialogResult::Cancel;
+
+			NSURL* url = [panel URL];
+			if (!url)
+				return FileDialogResult::Cancel;
+
+			outputFilename = [[url path] UTF8String];
+			return outputFilename.empty() ? FileDialogResult::Cancel : FileDialogResult::OK;
+		}
+#else
+		return FileDialogResult::Cancel;
+#endif
 	}
 
 	FileDialogResult FileDialog::openFile()

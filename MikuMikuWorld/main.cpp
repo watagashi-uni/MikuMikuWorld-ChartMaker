@@ -1,32 +1,76 @@
 #include "Application.h"
 #include "IO.h"
 #include "UI.h"
+#ifdef _WIN32
 #include "Windows.h"
+#else
+#include <filesystem>
+#ifdef __APPLE__
+#import <AppKit/AppKit.h>
+#endif
+#endif
+#include <stdexcept>
+#include <vector>
 
 namespace mmw = MikuMikuWorld;
 mmw::Application app;
 
-int main()
-{
-	int argc;
-	LPWSTR* args;
-	args = CommandLineToArgvW(GetCommandLineW(), &argc);
-	if (!args)
-	{
-		IO::messageBox(APP_NAME, "CommandLineToArgvW failed...", IO::MessageBoxButtons::Ok, IO::MessageBoxIcon::Error);
-		return 1;
-	}
+#ifdef __APPLE__
+@interface MMWMacApplicationDelegate : NSObject<NSApplicationDelegate>
+@end
 
+@implementation MMWMacApplicationDelegate
+- (void)appendOpenFilename:(NSString*)filename
+{
+	if (filename != nil)
+		app.appendOpenFile(std::string([filename UTF8String]));
+}
+
+- (void)application:(NSApplication*)application openFiles:(NSArray<NSString*>*)filenames
+{
+	for (NSString* filename in filenames)
+		[self appendOpenFilename:filename];
+
+	[application replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+}
+
+- (void)handleOpenDocumentsEvent:(NSAppleEventDescriptor*)event withReplyEvent:(NSAppleEventDescriptor*)replyEvent
+{
+	NSAppleEventDescriptor* documents = [event paramDescriptorForKeyword:keyDirectObject];
+	for (NSInteger index = 1; index <= documents.numberOfItems; ++index)
+	{
+		NSAppleEventDescriptor* item = [documents descriptorAtIndex:index];
+		NSString* filename = nil;
+
+		if ([item respondsToSelector:@selector(fileURLValue)])
+		{
+			NSURL* fileUrl = [item fileURLValue];
+			filename = fileUrl.path;
+		}
+
+		if (filename == nil)
+			filename = item.stringValue;
+
+		[self appendOpenFilename:filename];
+	}
+}
+@end
+
+static MMWMacApplicationDelegate* macApplicationDelegate = nil;
+#endif
+
+static int runApplication(int argc, const std::string& appPath, const std::vector<std::string>& openFiles)
+{
 	try
 	{
-		std::string dir = IO::File::getFilepath(IO::wideStringToMb(args[0]));
+		std::string dir = IO::File::getFilepath(appPath);
 		mmw::Result result = app.initialize(dir);
 		
 		if (!result.isOk())
-			throw (std::exception(result.getMessage().c_str()));
+			throw std::runtime_error(result.getMessage());
 
-		for (int i = 1; i < argc; ++i)
-			app.appendOpenFile(IO::wideStringToMb(args[i]));
+		for (const auto& file : openFiles)
+			app.appendOpenFile(file);
 
 		app.handlePendingOpenFiles();
 		app.run();
@@ -58,6 +102,25 @@ int main()
 
 	app.dispose();
 	return 0;
+}
+
+#ifdef _WIN32
+int main()
+{
+	int argc;
+	LPWSTR* args;
+	args = CommandLineToArgvW(GetCommandLineW(), &argc);
+	if (!args)
+	{
+		IO::messageBox(APP_NAME, "CommandLineToArgvW failed...", IO::MessageBoxButtons::Ok, IO::MessageBoxIcon::Error);
+		return 1;
+	}
+
+	std::vector<std::string> openFiles;
+	for (int i = 1; i < argc; ++i)
+		openFiles.push_back(IO::wideStringToMb(args[i]));
+
+	return runApplication(argc, IO::wideStringToMb(args[0]), openFiles);
 }
 
 LRESULT CALLBACK wndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -116,3 +179,28 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	return ::DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
+#else
+int main(int argc, char** argv)
+{
+#ifdef __APPLE__
+	@autoreleasepool
+	{
+		NSApplication* application = [NSApplication sharedApplication];
+		macApplicationDelegate = [MMWMacApplicationDelegate new];
+		[application setDelegate:macApplicationDelegate];
+		[[NSAppleEventManager sharedAppleEventManager]
+			setEventHandler:macApplicationDelegate
+			andSelector:@selector(handleOpenDocumentsEvent:withReplyEvent:)
+			forEventClass:kCoreEventClass
+			andEventID:kAEOpenDocuments];
+	}
+#endif
+
+	std::vector<std::string> openFiles;
+	for (int i = 1; i < argc; ++i)
+		openFiles.emplace_back(argv[i]);
+
+	std::filesystem::path appPath = argc > 0 ? std::filesystem::absolute(argv[0]) : std::filesystem::current_path();
+	return runApplication(argc, appPath.string(), openFiles);
+}
+#endif

@@ -11,11 +11,13 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
 #include <Windows.h>
 #include "dwmapi.h"
+#endif
 
 #undef min
 #undef max
@@ -419,6 +421,7 @@ namespace MikuMikuWorld
 
 	bool UI::isSystemDarkMode()
 	{
+#ifdef _WIN32
 		char buffer[4];
 		DWORD size = static_cast<DWORD>(sizeof(char) * 4);
 
@@ -437,10 +440,14 @@ namespace MikuMikuWorld
 
 		int i = int(buffer[3] << 24 | buffer[2] << 16 | buffer[1] << 8 | buffer[0]);
 		return i == 0;
+#else
+		return false;
+#endif
 	}
 
 	void UI::setDarkMode(bool enabled)
 	{
+#ifdef _WIN32
 		GLFWwindow* window = glfwGetCurrentContext();
 		if (!window)
 			return;
@@ -448,6 +455,7 @@ namespace MikuMikuWorld
 		HWND hwnd = glfwGetWin32Window(window);
 		BOOL isDarkMode = enabled;
 		::DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &isDarkMode, sizeof(isDarkMode));
+#endif
 	}
 
 	void UI::updateBtnSizesDpiScaling(float scale)

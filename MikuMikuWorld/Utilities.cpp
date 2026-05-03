@@ -3,7 +3,11 @@
 #include "ImGui/imgui.h"
 #include "Localization.h"
 #include "IO.h"
+#ifdef _WIN32
 #include <Windows.h>
+#endif
+#include <clocale>
+#include <cstdlib>
 #include <ctime>
 
 namespace MikuMikuWorld
@@ -21,6 +25,7 @@ namespace MikuMikuWorld
 
 	std::string Utilities::getSystemLocale()
 	{
+#ifdef _WIN32
 		LPWSTR lpLocalName = new WCHAR[LOCALE_NAME_MAX_LENGTH];
 		int result = GetUserDefaultLocaleName(lpLocalName, LOCALE_NAME_MAX_LENGTH);
 
@@ -29,6 +34,19 @@ namespace MikuMikuWorld
 
 		delete[] lpLocalName;
 		return IO::wideStringToMb(wL);
+#else
+		const char* locale = std::setlocale(LC_CTYPE, "");
+		if (!locale || !*locale)
+			locale = std::getenv("LANG");
+		if (!locale || !*locale)
+			return "en";
+
+		std::string value = locale;
+		size_t end = value.find_first_of("_-.");
+		if (end != std::string::npos)
+			value = value.substr(0, end);
+		return value.empty() ? "en" : value;
+#endif
 	}
 
 	std::string Utilities::getDivisionString(int div)

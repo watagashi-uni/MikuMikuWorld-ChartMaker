@@ -100,7 +100,7 @@ namespace MikuMikuWorld
 	std::vector<SUSNote> SusParser::getNotes(const SusDataLine& line)
 	{
 		std::vector<SUSNote> notes;
-		for (size_t i = 0; i < line.data.size(); i += 2)
+		for (size_t i = 0; i + 1 < line.data.size(); i += 2)
 		{
 			if (line.data[i] == '0' && line.data[i + 1] == '0')
 				continue;
@@ -120,7 +120,7 @@ namespace MikuMikuWorld
 		std::vector<BPM> bpms;
 		for (const auto& line : bpmLines)
 		{
-			for (size_t i = 0; i < line.data.size(); i += 2)
+			for (size_t i = 0; i + 1 < line.data.size(); i += 2)
 			{
 				if (line.data[i] == '0' && line.data[i + 1] == '0')
 					continue;
