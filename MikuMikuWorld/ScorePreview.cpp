@@ -661,13 +661,12 @@ namespace MikuMikuWorld
 		const float total_tm = accumulateDuration(context.scorePreviewDrawData.maxTicks, TICKS_PER_BEAT, context.score.tempoChanges);
 		const double current_tm = accumulateDuration(context.currentTick, TICKS_PER_BEAT, context.score.tempoChanges);
 		const double current_stm = accumulateScaledDuration(context.currentTick, TICKS_PER_BEAT, context.score.tempoChanges, context.score.hiSpeedChanges);
-		const float noteDuration = Engine::getNoteDuration(config.pvNoteSpeed);
-		const double visible_stm = current_stm + noteDuration;
 		const float mirror = config.pvMirrorScore ? -1 : 1;
 		const auto& drawData = context.scorePreviewDrawData;
 
 		for (auto& segment : drawData.drawingHoldSegments)
 		{
+			const double visible_stm = current_stm + segment.visibleDuration;
 			if ((std::min(segment.headTime, segment.tailTime) > visible_stm && segment.startTime > current_tm) || current_tm >= segment.endTime)
 				continue;
 
@@ -705,7 +704,7 @@ namespace MikuMikuWorld
 			}
 
 			const int steps = (segment.ease == EaseType::Linear ? 10 : 15)
-				+ static_cast<int>(std::log(std::max((segmentEnd_stm - segmentStart_stm) / noteDuration, 4.5399e-5)) + 0.5); // Reduce steps if the segment is relatively small
+				+ static_cast<int>(std::log(std::max((segmentEnd_stm - segmentStart_stm) / segment.visibleDuration, 4.5399e-5)) + 0.5); // Reduce steps if the segment is relatively small
 			const auto ease = getEaseFunction(segment.ease);
 			float startLeft = segment.headLeft;
 			float startRight = segment.headRight;
@@ -734,9 +733,6 @@ namespace MikuMikuWorld
 				double headProgress = segment.tailStepIndex / totalJoints;
 				double tailProgress = (segment.tailStepIndex + 1) / totalJoints;
 
-				double holdStart_stm = accumulateScaledDuration(holdStart.tick, TICKS_PER_BEAT, context.score.tempoChanges, context.score.hiSpeedChanges);
-				double holdEnd_stm = accumulateScaledDuration(holdEnd.tick, TICKS_PER_BEAT, context.score.tempoChanges, context.score.hiSpeedChanges);
-				
 				if (!isSegmentActivated)
 				{
 					holdStartProgress = headProgress;
@@ -751,7 +747,7 @@ namespace MikuMikuWorld
 
 			double from_percentage = 0;
 			double stepStart_stm = segmentStart_stm;
-			double stepTop = Engine::approach(stepStart_stm - noteDuration, stepStart_stm, current_stm);
+			double stepTop = Engine::approach(stepStart_stm - segment.visibleDuration, stepStart_stm, current_stm);
 			double stepStartProgress = segmentStartProgress;
 
 			auto model = DirectX::XMMatrixIdentity();
@@ -762,7 +758,7 @@ namespace MikuMikuWorld
 			{
 				double to_percentage = double(i + 1) / steps;
 				double stepEnd_stm = lerpD(segmentStart_stm, segmentEnd_stm, to_percentage);
-				double stepBottom = Engine::approach(stepEnd_stm - noteDuration, stepEnd_stm, current_stm);
+				double stepBottom = Engine::approach(stepEnd_stm - segment.visibleDuration, stepEnd_stm, current_stm);
 				double stepEndProgress = lerpD(segmentStartProgress, segmentEndProgress, to_percentage);
 
 				float stepStartLeft = ease(startLeft, endLeft, stepStartProgress);

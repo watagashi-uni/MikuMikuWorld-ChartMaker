@@ -3,6 +3,7 @@
 #include "Score.h"
 #include "ImageCrop.h"
 #include <algorithm>
+#include <cmath>
 
 namespace MikuMikuWorld
 {
@@ -200,5 +201,21 @@ namespace MikuMikuWorld
 		}
 
 		return se;
+	}
+
+	float getEffectiveSpeedRatio(const Note& note, const Score& score)
+	{
+		float speedRatio = note.speedRatio;
+		if (note.getType() == NoteType::HoldMid || note.getType() == NoteType::HoldEnd)
+		{
+			const auto parent = score.notes.find(note.parentID);
+			if (parent != score.notes.end())
+				speedRatio = parent->second.speedRatio;
+		}
+
+		if (!std::isfinite(speedRatio) || speedRatio <= 0.0f)
+			return 1.0f;
+
+		return speedRatio;
 	}
 }

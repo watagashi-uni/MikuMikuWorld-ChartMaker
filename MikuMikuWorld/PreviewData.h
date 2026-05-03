@@ -23,6 +23,7 @@ namespace MikuMikuWorld::Engine
 	{
 		Range xPos;
 		Range visualTime;
+		float visibleDuration;
 	};
 
 	struct DrawingHoldTick
@@ -30,6 +31,7 @@ namespace MikuMikuWorld::Engine
 		int refID;
 		float center;
 		Range visualTime;
+		float visibleDuration;
 	};
 
 	struct DrawingHoldSegment
@@ -43,6 +45,7 @@ namespace MikuMikuWorld::Engine
 		float tailLeft, tailRight;
 		float startTime, endTime;
 		double activeTime;
+		float visibleDuration;
 	};
 
 	struct DrawData

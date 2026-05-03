@@ -26,6 +26,7 @@ namespace MikuMikuWorld::Engine
 		{
 			this->noteSpeed = config.pvNoteSpeed;
 			std::map<int, Range> simBuilder;
+			std::map<int, float> simDurationBuilder;
 			for (auto rit = score.notes.rbegin(), rend = score.notes.rend(); rit != rend; rit++)
 			{
 				auto& [id, note] = *rit;
@@ -44,6 +45,9 @@ namespace MikuMikuWorld::Engine
 				// Find the max and min lane within the same height (visual_tm.max)
 				float center = getNoteCenter(note);
 				auto&& [it, has_emplaced] = simBuilder.try_emplace(note.tick, Range{center, center});
+				auto&& [dit, has_dur] = simDurationBuilder.try_emplace(note.tick, getNoteVisibleDuration(note, score, noteSpeed));
+				if (!has_dur)
+					dit->second = std::max(dit->second, getNoteVisibleDuration(note, score, noteSpeed));
 				auto& x_range = it->second;
 				if (has_emplaced)
 					continue;
@@ -54,13 +58,12 @@ namespace MikuMikuWorld::Engine
 				continue;
 			}
 
-			float noteDuration = getNoteDuration(noteSpeed);
 			for (const auto& [line_tick, x_range] : simBuilder)
 			{
 				if (x_range.min != x_range.max)
 				{
 					double targetTime = accumulateScaledDuration(line_tick, TICKS_PER_BEAT, score.tempoChanges, score.hiSpeedChanges);
-					drawingLines.push_back(DrawingLine{ x_range, Range{ targetTime - getNoteDuration(noteSpeed), targetTime } });
+					drawingLines.push_back(DrawingLine{ x_range, Range{ targetTime - simDurationBuilder.at(line_tick), targetTime }, simDurationBuilder.at(line_tick) });
 				}
 			}
 
@@ -88,7 +91,7 @@ namespace MikuMikuWorld::Engine
 
 	void addHoldNote(DrawData &drawData, const HoldNote &holdNote, Score const &score)
 	{
-		float noteDuration = getNoteDuration(drawData.noteSpeed);
+		const float noteDuration = getNoteVisibleDuration(score.notes.at(holdNote.start.ID), score, drawData.noteSpeed);
 		const Note& startNote = score.notes.at(holdNote.start.ID), endNote = score.notes.at(holdNote.end);
 		float activeTime = accumulateDuration(startNote.tick, TICKS_PER_BEAT, score.tempoChanges);
 		float startTime = activeTime;
@@ -117,14 +120,15 @@ namespace MikuMikuWorld::Engine
 			drawData.drawingHoldSegments.push_back(DrawingHoldSegment {
 				holdNote.end, 
 				head.ease,
-				holdNote.isGuide(),
-				tailIdx,
-				head.time, tail.time,
-				head.left, head.right,
-				tail.left, tail.right,
-				startTime, endTime,
-				activeTime,
-			});
+			holdNote.isGuide(),
+			tailIdx,
+			head.time, tail.time,
+			head.left, head.right,
+			tail.left, tail.right,
+			startTime, endTime,
+			activeTime,
+			noteDuration,
+		});
 			startTime = endTime;
 			while ((headIdx + 1) < tailIdx)
 			{
@@ -140,7 +144,8 @@ namespace MikuMikuWorld::Engine
 				drawData.drawingHoldTicks.push_back(DrawingHoldTick{
 					skipStep.ID,
 					skipLeft + (skipRight - skipLeft) / 2,
-					Range{tickTime - noteDuration, tickTime}
+					Range{tickTime - noteDuration, tickTime},
+					noteDuration
 				});
 				++headIdx;
 			}
@@ -150,7 +155,8 @@ namespace MikuMikuWorld::Engine
 				drawData.drawingHoldTicks.push_back(DrawingHoldTick{
 					tailNote.ID,
 					getNoteCenter(tailNote),
-					{tickTime - noteDuration, tickTime}
+					{tickTime - noteDuration, tickTime},
+					noteDuration
 				});
 			}
 			head = tail;

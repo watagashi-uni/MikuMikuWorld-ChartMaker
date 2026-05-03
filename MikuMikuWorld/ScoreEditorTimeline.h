@@ -64,6 +64,12 @@ namespace MikuMikuWorld
 		bool enabled;
 	};
 
+	struct SpeedRatioLabelDrawData
+	{
+		ImVec2 pos;
+		std::string text;
+	};
+
 	class ScoreEditorTimeline
 	{
 	private:
@@ -165,6 +171,7 @@ namespace MikuMikuWorld
 		std::map<int, std::pair<float, float>> eventControlCursor;
 		std::stack<EventControlDrawData> drawEvents;
 		std::vector<StepDrawData> drawSteps;
+		std::vector<SpeedRatioLabelDrawData> drawSpeedRatioLabels;
 		std::unordered_set<std::string> playingNoteSounds;
 		std::array<char, 32> noteSpeedRatioInput{};
 		static constexpr float audioLookAhead = 0.05f;
@@ -182,6 +189,7 @@ namespace MikuMikuWorld
 		void drawHoldNote(const std::map<int, Note>& notes, const HoldNote& note, Renderer* renderer, const Color& tint, const int offsetTicks = 0, const int offsetLane = 0);
 		void drawHoldMid(Note& note, HoldStepType type, Renderer* renderer, const Color& tint);
 		void drawOutline(const StepDrawData& data);
+		void drawQueuedSpeedRatioLabels();
 		void drawFlickArrow(const Note& note, Renderer* renderer, const Color& tint, const int offsetTick = 0, const int offsetLane = 0);
 		void drawSpeedRatioLabel(const Note& note, const int offsetTick = 0, const int offsetLane = 0);
 		void drawNote(const Note& note, Renderer* renderer, const Color& tint, const int offsetTick = 0, const int offsetLane = 0);

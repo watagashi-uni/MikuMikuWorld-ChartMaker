@@ -128,4 +128,5 @@ namespace MikuMikuWorld
 	int getNoteSpriteIndex(const Note& note);
 	int getFrictionSpriteIndex(const Note& note);
 	std::string_view getNoteSE(const Note& note, const Score& score);
+	float getEffectiveSpeedRatio(const Note& note, const Score& score);
 }

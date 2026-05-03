@@ -759,6 +759,7 @@ namespace MikuMikuWorld
 				}
 			}
 
+			drawQueuedSpeedRatioLabels();
 			drawList->PopClipRect();
 
 			// Status bar: playback controls, division, zoom, current time and rhythm
@@ -891,6 +892,7 @@ namespace MikuMikuWorld
 	{
 		// directxmath dies
 		if (size.y < 10 || size.x < 10) return;
+		drawSpeedRatioLabels.clear();
 
 		Shader* shader = ResourceManager::shaders[0];
 		shader->use();
@@ -1896,9 +1898,24 @@ namespace MikuMikuWorld
 		const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
 		const float x1 = position.x + laneToPosition(note.lane + offsetLane);
 		const float x2 = position.x + laneToPosition(note.lane + note.width + offsetLane);
-		const float y = position.y - tickToPosition(note.tick + offsetTick) + visualOffset - notesHeight - 3.0f;
-		const ImVec2 textPos{ midpoint(x1, x2) - (textSize.x * 0.5f), y - textSize.y };
-		drawShadedText(ImGui::GetWindowDrawList(), textPos, 16.0f, 0xFFF8F8F8, text.c_str());
+		const float labelGap = 0.5f;
+		const float y = position.y - tickToPosition(note.tick + offsetTick) + visualOffset - (notesHeight * 0.35f) - labelGap;
+		drawSpeedRatioLabels.push_back({
+			{ midpoint(x1, x2) - (textSize.x * 0.5f), y - textSize.y },
+			text
+		});
+	}
+
+	void ScoreEditorTimeline::drawQueuedSpeedRatioLabels()
+	{
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		if (!drawList)
+			return;
+
+		for (const auto& label : drawSpeedRatioLabels)
+			drawShadedText(drawList, label.pos, 16.0f, 0xFFF8F8F8, label.text.c_str());
+
+		drawSpeedRatioLabels.clear();
 	}
 
 	void ScoreEditorTimeline::drawOutline(const StepDrawData& data)

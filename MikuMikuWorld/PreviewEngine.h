@@ -65,6 +65,7 @@ namespace MikuMikuWorld::Engine
 	std::array<DirectX::XMFLOAT4, 4> quadUV(const Sprite& sprite, const Texture& texture);
 
 	Range getNoteVisualTime(Note const& note, Score const& score, float noteSpeed);
+	float getNoteVisibleDuration(Note const& note, Score const& score, float noteSpeed);
 
 	/// General helper functions for fixed values in the engine
 	static inline float getNoteDuration(float noteSpeed)

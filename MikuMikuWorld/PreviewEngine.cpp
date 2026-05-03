@@ -31,10 +31,15 @@ namespace MikuMikuWorld
 
 namespace MikuMikuWorld::Engine
 {
+	float getNoteVisibleDuration(Note const& note, Score const& score, float noteSpeed)
+	{
+		return Engine::getNoteDuration(noteSpeed) / MikuMikuWorld::getEffectiveSpeedRatio(note, score);
+	}
+
 	Range getNoteVisualTime(Note const& note, Score const& score, float noteSpeed)
 	{
 		double targetTime = accumulateScaledDuration(note.tick, TICKS_PER_BEAT, score.tempoChanges, score.hiSpeedChanges);
-		return {targetTime - getNoteDuration(noteSpeed), targetTime};
+		return {targetTime - getNoteVisibleDuration(note, score, noteSpeed), targetTime};
 	}
 
 	std::array<DirectX::XMFLOAT4, 4> quadvPos(float left, float right, float top, float bottom)

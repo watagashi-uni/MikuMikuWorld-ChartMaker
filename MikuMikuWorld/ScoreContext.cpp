@@ -729,14 +729,7 @@ namespace MikuMikuWorld
 
 	float ScoreContext::getEffectiveSpeedRatio(const Note& note) const
 	{
-		if (note.getType() == NoteType::HoldMid || note.getType() == NoteType::HoldEnd)
-		{
-			const auto parent = score.notes.find(note.parentID);
-			if (parent != score.notes.end())
-				return parent->second.speedRatio;
-		}
-
-		return note.speedRatio;
+		return MikuMikuWorld::getEffectiveSpeedRatio(note, score);
 	}
 
 	std::unordered_set<int> ScoreContext::getSpeedRatioTargetsFromSelection() const
@@ -748,9 +741,7 @@ namespace MikuMikuWorld
 				continue;
 
 			const Note& note = score.notes.at(id);
-			if (note.getType() == NoteType::HoldMid || note.getType() == NoteType::HoldEnd)
-				targets.insert(note.parentID);
-			else
+			if (note.getType() == NoteType::Tap || note.getType() == NoteType::Hold)
 				targets.insert(note.ID);
 		}
 
