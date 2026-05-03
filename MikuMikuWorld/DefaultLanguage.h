@@ -166,6 +166,7 @@ namespace MikuMikuWorld
 		{"ease_type", "Ease Type"},
 		{"flick_type", "Flick Type"},
 		{"hold_type", "Hold Type"},
+		{"note_speed_ratio", "Note Speed Ratio"},
 		{"metadata", "Metadata"},
 		{"title", "Title"},
 		{"designer", "Designer"},

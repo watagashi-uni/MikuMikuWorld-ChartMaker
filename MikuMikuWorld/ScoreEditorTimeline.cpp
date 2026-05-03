@@ -11,6 +11,8 @@
 #include "NoteSkin.h"
 #include <cmath>
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 
 namespace MikuMikuWorld
 {
@@ -308,6 +310,9 @@ namespace MikuMikuWorld
 	{
 		if (ImGui::BeginPopupContextWindow(IMGUI_TITLE(ICON_FA_MUSIC, "notes_timeline")))
 		{
+			if (ImGui::IsWindowAppearing())
+				syncNoteSpeedRatioInput(context);
+
 			if (ImGui::MenuItem(getString("delete"), ToShortcutString(config.input.deleteSelection), false, !context.selectedNotes.empty()))
 				context.deleteSelection();
 
@@ -357,6 +362,20 @@ namespace MikuMikuWorld
 				*/
 				for (int i = 0; i < arrayLength(holdTypes) - 1; i++)
 					if (ImGui::MenuItem(getString(holdTypes[i]))) context.setHoldType((HoldNoteType)i);
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu(getString("note_speed_ratio"), context.selectionHasEditableSpeedRatio()))
+			{
+				const ImGuiInputTextFlags flags = ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsScientific | ImGuiInputTextFlags_EnterReturnsTrue;
+				ImGui::SetNextItemWidth(140.0f);
+				const bool submitted = ImGui::InputText("##note_speed_ratio", noteSpeedRatioInput.data(), noteSpeedRatioInput.size(), flags);
+				if ((submitted || ImGui::Button(getString("confirm"), ImVec2(-1, 0))) && applyNoteSpeedRatioInput(context))
+				{
+					syncNoteSpeedRatioInput(context);
+					ImGui::CloseCurrentPopup();
+				}
+
 				ImGui::EndMenu();
 			}
 
@@ -1865,6 +1884,23 @@ namespace MikuMikuWorld
 			tex, s.getX1(), s.getX1() + s.getWidth(), s.getY1(), s.getY1() + s.getHeight(), tint, 1);
 	}
 
+	void ScoreEditorTimeline::drawSpeedRatioLabel(const Note& note, const int offsetTick, const int offsetLane)
+	{
+		if ((note.getType() != NoteType::Tap && note.getType() != NoteType::Hold)
+			|| std::abs(note.speedRatio - 1.0f) <= 0.0001f)
+		{
+			return;
+		}
+
+		const std::string text = IO::formatString("%sx", IO::formatFixedFloatTrimmed(note.speedRatio).c_str());
+		const ImVec2 textSize = ImGui::CalcTextSize(text.c_str());
+		const float x1 = position.x + laneToPosition(note.lane + offsetLane);
+		const float x2 = position.x + laneToPosition(note.lane + note.width + offsetLane);
+		const float y = position.y - tickToPosition(note.tick + offsetTick) + visualOffset - notesHeight - 3.0f;
+		const ImVec2 textPos{ midpoint(x1, x2) - (textSize.x * 0.5f), y - textSize.y };
+		drawShadedText(ImGui::GetWindowDrawList(), textPos, 16.0f, 0xFFF8F8F8, text.c_str());
+	}
+
 	void ScoreEditorTimeline::drawOutline(const StepDrawData& data)
 	{
 		float x = position.x;
@@ -1973,6 +2009,33 @@ namespace MikuMikuWorld
 
 		if (note.isFlick())
 			drawFlickArrow(note, renderer, tint, offsetTick, offsetLane);
+
+		drawSpeedRatioLabel(note, offsetTick, offsetLane);
+	}
+
+	void ScoreEditorTimeline::syncNoteSpeedRatioInput(const ScoreContext& context)
+	{
+		noteSpeedRatioInput.fill('\0');
+		if (!context.selectionHasEditableSpeedRatio() || context.selectionHasMixedSpeedRatios())
+			return;
+
+		const std::unordered_set<int> targets = context.getSpeedRatioTargetsFromSelection();
+		if (targets.empty())
+			return;
+
+		const std::string value = IO::formatFixedFloatTrimmed(context.score.notes.at(*targets.begin()).speedRatio);
+		std::snprintf(noteSpeedRatioInput.data(), noteSpeedRatioInput.size(), "%s", value.c_str());
+	}
+
+	bool ScoreEditorTimeline::applyNoteSpeedRatioInput(ScoreContext& context)
+	{
+		char* end = nullptr;
+		float speedRatio = std::strtof(noteSpeedRatioInput.data(), &end);
+		if (end == noteSpeedRatioInput.data() || (end != nullptr && *end != '\0') || !std::isfinite(speedRatio) || speedRatio <= 0.0f)
+			return false;
+
+		context.setSpeedRatio(speedRatio);
+		return true;
 	}
 
 	bool ScoreEditorTimeline::bpmControl(const Tempo& tempo)
@@ -2348,11 +2411,12 @@ namespace MikuMikuWorld
 					boolToString(note.friction),
 					flickTypes[static_cast<int>(note.flick)]
 				);
+				ImGui::Text("Speed Ratio: %g", context.getEffectiveSpeedRatio(note));
 			}
 			else
 			{
 				// Prevent window scrolling from jumping around
-				ImGui::TextDisabled("ID: -\nType: -\nTick: -\nLane: -\nWidth: -\nCritical: -\nFriction: -\nFlick: -");
+				ImGui::TextDisabled("ID: -\nType: -\nTick: -\nLane: -\nWidth: -\nCritical: -\nFriction: -\nFlick: -\nSpeed Ratio: -");
 			}
 		}
 	}

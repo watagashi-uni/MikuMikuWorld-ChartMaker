@@ -5,9 +5,9 @@ namespace MikuMikuWorld
 {
 	using namespace IO;
 
-	const int NativeScoreSerializer::SCORE_VERSION = 5;
+	const int NativeScoreSerializer::SCORE_VERSION = 6;
 
-	Note NativeScoreSerializer::readNote(NoteType type, IO::BinaryReader* reader)
+	Note NativeScoreSerializer::readNote(NoteType type, int version, IO::BinaryReader* reader)
 	{
 		Note note(type);
 		note.tick = reader->readInt32();
@@ -20,6 +20,8 @@ namespace MikuMikuWorld
 		unsigned int flags = reader->readInt32();
 		note.critical = (bool)(flags & NOTE_CRITICAL);
 		note.friction = (bool)(flags & NOTE_FRICTION);
+		if (version > 5)
+			note.speedRatio = reader->readSingle();
 		return note;
 	}
 
@@ -36,6 +38,7 @@ namespace MikuMikuWorld
 		if (note.critical) flags |= NOTE_CRITICAL;
 		if (note.friction) flags |= NOTE_FRICTION;
 		writer->writeInt32(flags);
+		writer->writeSingle(note.speedRatio);
 	}
 
 	ScoreMetadata NativeScoreSerializer::readMetadata(IO::BinaryReader* reader, int version)
@@ -283,7 +286,7 @@ namespace MikuMikuWorld
 		int noteCount = reader.readInt32();
 		for (int i = 0; i < noteCount; ++i)
 		{
-			Note note = readNote(NoteType::Tap, &reader);
+			Note note = readNote(NoteType::Tap, version, &reader);
 			note.ID = nextID++;
 			score.notes[note.ID] = note;
 		}
@@ -309,7 +312,7 @@ namespace MikuMikuWorld
 			if (flags & HOLD_GUIDE)
 				hold.startType = hold.endType = HoldNoteType::Guide;
 
-			Note start = readNote(NoteType::Hold, &reader);
+			Note start = readNote(NoteType::Hold, version, &reader);
 			start.ID = nextID++;
 			hold.start.ease = (EaseType)reader.readInt32();
 			hold.start.ID = start.ID;
@@ -319,7 +322,7 @@ namespace MikuMikuWorld
 			hold.steps.reserve(stepCount);
 			for (int i = 0; i < stepCount; ++i)
 			{
-				Note mid = readNote(NoteType::HoldMid, &reader);
+				Note mid = readNote(NoteType::HoldMid, version, &reader);
 				mid.ID = nextID++;
 				mid.parentID = start.ID;
 				score.notes[mid.ID] = mid;
@@ -331,7 +334,7 @@ namespace MikuMikuWorld
 				hold.steps.push_back(step);
 			}
 
-			Note end = readNote(NoteType::HoldEnd, &reader);
+			Note end = readNote(NoteType::HoldEnd, version, &reader);
 			end.ID = nextID++;
 			end.parentID = start.ID;
 			score.notes[end.ID] = end;

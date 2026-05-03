@@ -31,6 +31,7 @@ namespace MikuMikuWorld
 			int nextConnectionId{ -1 };
 			int direction{};
 			int noteLineType{};
+			float speedRatio{ 1.0f };
 			bool critical{};
 			bool isSkip{};
 		};
@@ -255,7 +256,15 @@ namespace MikuMikuWorld
 			return std::clamp(note.lane + note.width - 1, MIN_LANE, MAX_LANE);
 		}
 
-		ExportNote makeBaseExportNote(const Note& note, int id)
+		float sanitizeSpeedRatio(float speedRatio)
+		{
+			if (!std::isfinite(speedRatio) || speedRatio <= 0.0f)
+				return 1.0f;
+
+			return speedRatio;
+		}
+
+		ExportNote makeBaseExportNote(const Note& note, int id, float speedRatio)
 		{
 			return ExportNote{
 				id,
@@ -264,7 +273,7 @@ namespace MikuMikuWorld
 				laneEndFrom(note),
 				0,
 				note.critical ? 1 : 0,
-				1.0f,
+				sanitizeSpeedRatio(speedRatio),
 				0,
 				1,
 				-1,
@@ -303,7 +312,7 @@ namespace MikuMikuWorld
 
 		ExportNote makeTapExportNote(const Note& note, int id)
 		{
-			ExportNote raw = makeBaseExportNote(note, id);
+			ExportNote raw = makeBaseExportNote(note, id, note.speedRatio);
 			applyTapLikeCategory(raw, note);
 			return raw;
 		}
@@ -315,9 +324,10 @@ namespace MikuMikuWorld
 			int id,
 			int previousId,
 			int nextId,
-			EaseType ease)
+			EaseType ease,
+			float speedRatio)
 		{
-			ExportNote raw = makeBaseExportNote(note, id);
+			ExportNote raw = makeBaseExportNote(note, id, speedRatio);
 			raw.previousConnectionId = previousId;
 			raw.nextConnectionId = nextId;
 			raw.isSingle = false;
@@ -365,9 +375,10 @@ namespace MikuMikuWorld
 			bool isGuide,
 			int id,
 			int previousId,
-			int nextId)
+			int nextId,
+			float speedRatio)
 		{
-			ExportNote raw = makeBaseExportNote(note, id);
+			ExportNote raw = makeBaseExportNote(note, id, speedRatio);
 			raw.previousConnectionId = previousId;
 			raw.nextConnectionId = nextId;
 			raw.noteLineType = lineTypeFromEase(step.ease);
@@ -439,6 +450,7 @@ namespace MikuMikuWorld
 				toInt(js, "nextConnectionId", -1),
 				toInt(js, "direction"),
 				toInt(js, "noteLineType"),
+				sanitizeSpeedRatio(toFloat(js, "speedRatio", 1.0f)),
 				toBool(js, "type"),
 				toBool(js, "isSkip"),
 			};
@@ -451,6 +463,7 @@ namespace MikuMikuWorld
 
 			Note note(NoteType::Tap, raw.ticks, lane(raw), width(raw));
 			note.ID = nextID++;
+			note.speedRatio = raw.speedRatio;
 			note.critical = forceCritical || raw.critical;
 			note.friction = isTraceNote(raw);
 			if (isFlickNote(raw) || isTraceFlickNote(raw) || raw.direction == 1 || raw.direction == 2)
@@ -573,6 +586,7 @@ namespace MikuMikuWorld
 				Note note(noteType, raw.ticks, lane(raw), width(raw));
 				note.ID = isFirst ? startID : nextID++;
 				note.parentID = isFirst ? -1 : startID;
+				note.speedRatio = raw.speedRatio;
 				note.critical = raw.critical;
 				note.friction = isTraceNote(raw);
 				if (isFlickNote(raw) || isTraceFlickNote(raw) || raw.direction == 1 || raw.direction == 2)
@@ -745,6 +759,7 @@ namespace MikuMikuWorld
 		{
 			const Note& start = score.notes.at(hold.start.ID);
 			const Note& end = score.notes.at(hold.end);
+			const float holdSpeedRatio = sanitizeSpeedRatio(start.speedRatio);
 			const bool isGuide = hold.isGuide();
 			const size_t chainSize = hold.steps.size() + 2;
 			std::vector<int> ids(chainSize);
@@ -758,7 +773,8 @@ namespace MikuMikuWorld
 				ids.front(),
 				-1,
 				chainSize > 1 ? ids[1] : -1,
-				hold.start.ease
+				hold.start.ease,
+				holdSpeedRatio
 			));
 
 			for (size_t index = 0; index < hold.steps.size(); ++index)
@@ -771,7 +787,8 @@ namespace MikuMikuWorld
 					isGuide,
 					ids[index + 1],
 					ids[index],
-					ids[index + 2]
+					ids[index + 2],
+					holdSpeedRatio
 				));
 			}
 
@@ -782,7 +799,8 @@ namespace MikuMikuWorld
 				ids.back(),
 				ids[ids.size() - 2],
 				-1,
-				EaseType::Linear
+				EaseType::Linear,
+				holdSpeedRatio
 			));
 		}
 

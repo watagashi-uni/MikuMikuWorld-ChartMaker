@@ -22,7 +22,7 @@ namespace MikuMikuWorld
 			HOLD_GUIDE = 1 << 2
 		};
 
-		Note readNote(NoteType type, IO::BinaryReader* reader);
+		Note readNote(NoteType type, int version, IO::BinaryReader* reader);
 		void writeNote(const Note& note, IO::BinaryWriter* writer);
 		ScoreMetadata readMetadata(IO::BinaryReader* reader, int version);
 		void writeMetadata(const ScoreMetadata& metadata, IO::BinaryWriter* writer);

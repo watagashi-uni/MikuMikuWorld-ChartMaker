@@ -6,6 +6,7 @@
 #include "TimelineMode.h"
 #include "Background.h"
 #include "RenderDebugStats.h"
+#include <array>
 
 namespace MikuMikuWorld
 {
@@ -165,6 +166,7 @@ namespace MikuMikuWorld
 		std::stack<EventControlDrawData> drawEvents;
 		std::vector<StepDrawData> drawSteps;
 		std::unordered_set<std::string> playingNoteSounds;
+		std::array<char, 32> noteSpeedRatioInput{};
 		static constexpr float audioLookAhead = 0.05f;
 
 		Debug::DebugRenderStats renderStats;
@@ -181,6 +183,7 @@ namespace MikuMikuWorld
 		void drawHoldMid(Note& note, HoldStepType type, Renderer* renderer, const Color& tint);
 		void drawOutline(const StepDrawData& data);
 		void drawFlickArrow(const Note& note, Renderer* renderer, const Color& tint, const int offsetTick = 0, const int offsetLane = 0);
+		void drawSpeedRatioLabel(const Note& note, const int offsetTick = 0, const int offsetLane = 0);
 		void drawNote(const Note& note, Renderer* renderer, const Color& tint, const int offsetTick = 0, const int offsetLane = 0);
 		bool eventControl(int tick, ImU32 color, const char* txt, bool fromStart, bool enabled);
 		bool noteControl(ScoreContext& context, const ImVec2& pos, const ImVec2& sz, const char* id, ImGuiMouseCursor cursor);
@@ -206,6 +209,8 @@ namespace MikuMikuWorld
 		void insertEvent(ScoreContext& context, EditArgs& edit);
 
 		void updateNoteSE(ScoreContext& context);
+		void syncNoteSpeedRatioInput(const ScoreContext& context);
+		bool applyNoteSpeedRatioInput(ScoreContext& context);
 
 		void contextMenu(ScoreContext& context);
 

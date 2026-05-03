@@ -3,6 +3,7 @@
 #include "Utilities.h"
 #include "UI.h"
 #include "Clipboard.h"
+#include <cmath>
 #include <vector>
 
 using json = nlohmann::json;
@@ -144,6 +145,28 @@ namespace MikuMikuWorld
 		}
 
 		pushHistory("Change hold", prev, score);
+	}
+
+	void ScoreContext::setSpeedRatio(float speedRatio)
+	{
+		if (!std::isfinite(speedRatio) || speedRatio <= 0.0f)
+			return;
+
+		const std::unordered_set<int> targets = getSpeedRatioTargetsFromSelection();
+		if (targets.empty())
+			return;
+
+		bool edit = false;
+		Score prev = score;
+		for (int id : targets)
+		{
+			Note& note = score.notes.at(id);
+			edit |= note.speedRatio != speedRatio;
+			note.speedRatio = speedRatio;
+		}
+
+		if (edit)
+			pushHistory("Change note speed ratio", prev, score);
 	}
 
 	void ScoreContext::toggleCriticals()
@@ -546,6 +569,7 @@ namespace MikuMikuWorld
 			earlierNoteAsMid.ID = nextID++;
 			earlierNoteAsMid.critical = earlierHoldStart.critical;
 			earlierNoteAsMid.parentID = earlierHold.start.ID;
+			earlierNoteAsMid.speedRatio = earlierHoldStart.speedRatio;
 
 			score.notes[earlierNoteAsMid.ID] = earlierNoteAsMid;
 			HoldStepType stepType = earlierHold.isGuide() ? HoldStepType::Hidden : HoldStepType::Normal;
@@ -558,6 +582,7 @@ namespace MikuMikuWorld
 		laterNoteAsMid.ID = nextID++;
 		laterNoteAsMid.critical = earlierHoldStart.critical;
 		laterNoteAsMid.parentID = earlierHold.start.ID;
+		laterNoteAsMid.speedRatio = earlierHoldStart.speedRatio;
 		
 		score.notes[laterNoteAsMid.ID] = laterNoteAsMid;
 		HoldStepType stepType = earlierHold.isGuide() ? HoldStepType::Hidden : laterHold.start.type;
@@ -604,10 +629,12 @@ namespace MikuMikuWorld
 		newSlideEnd.ID = nextID++;
 		newSlideEnd.parentID = hold.start.ID;
 		newSlideEnd.critical = note.critical;
+		newSlideEnd.speedRatio = holdStart.speedRatio;
 
 		Note newSlideStart = Note(NoteType::Hold, note.tick, note.lane, note.width);
 		newSlideStart.ID = nextID++;
 		newSlideStart.critical = holdStart.critical;
+		newSlideStart.speedRatio = holdStart.speedRatio;
 
 		HoldNote newHold;
 		newHold.end = hold.end;
@@ -698,6 +725,54 @@ namespace MikuMikuWorld
 		{	return noteExists(id1, score) && noteExists(id2, score) &&
 				score.notes.at(id1).tick < score.notes.at(id2).tick;
 		})).tick);
+	}
+
+	float ScoreContext::getEffectiveSpeedRatio(const Note& note) const
+	{
+		if (note.getType() == NoteType::HoldMid || note.getType() == NoteType::HoldEnd)
+		{
+			const auto parent = score.notes.find(note.parentID);
+			if (parent != score.notes.end())
+				return parent->second.speedRatio;
+		}
+
+		return note.speedRatio;
+	}
+
+	std::unordered_set<int> ScoreContext::getSpeedRatioTargetsFromSelection() const
+	{
+		std::unordered_set<int> targets;
+		for (int id : selectedNotes)
+		{
+			if (!noteExists(id, score))
+				continue;
+
+			const Note& note = score.notes.at(id);
+			if (note.getType() == NoteType::HoldMid || note.getType() == NoteType::HoldEnd)
+				targets.insert(note.parentID);
+			else
+				targets.insert(note.ID);
+		}
+
+		return targets;
+	}
+
+	bool ScoreContext::selectionHasEditableSpeedRatio() const
+	{
+		return !getSpeedRatioTargetsFromSelection().empty();
+	}
+
+	bool ScoreContext::selectionHasMixedSpeedRatios() const
+	{
+		const std::unordered_set<int> targets = getSpeedRatioTargetsFromSelection();
+		if (targets.empty())
+			return false;
+
+		const float first = score.notes.at(*targets.begin()).speedRatio;
+		return std::any_of(std::next(targets.begin()), targets.end(), [this, first](int id)
+		{
+			return std::abs(score.notes.at(id).speedRatio - first) > 0.0001f;
+		});
 	}
 
 	bool ScoreContext::selectionHasEase() const

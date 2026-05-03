@@ -69,6 +69,7 @@ namespace MikuMikuWorld
 		int tick;
 		int lane;
 		int width;
+		float speedRatio{ 1.0f };
 		bool critical{ false };
 		bool friction{ false };
 		FlickType flick{ FlickType::None };

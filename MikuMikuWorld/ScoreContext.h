@@ -103,6 +103,10 @@ namespace MikuMikuWorld
 		}
 
 		int minTickFromSelection() const;
+		float getEffectiveSpeedRatio(const Note& note) const;
+		std::unordered_set<int> getSpeedRatioTargetsFromSelection() const;
+		bool selectionHasEditableSpeedRatio() const;
+		bool selectionHasMixedSpeedRatios() const;
 		bool selectionHasEase() const;
 		bool selectionHasStep() const;
 		bool selectionHasAnyStep() const;
@@ -117,6 +121,7 @@ namespace MikuMikuWorld
 		void setFlick(FlickType flick);
 		void setEase(EaseType ease);
 		void setHoldType(HoldNoteType hold);
+		void setSpeedRatio(float speedRatio);
 		void toggleCriticals();
 		void toggleFriction();
 

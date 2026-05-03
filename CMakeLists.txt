@@ -1,3 +1,9 @@
+if(APPLE)
+    enable_language(OBJC)
+    enable_language(OBJCXX)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS deployment target")
+endif()
+
 cmake_minimum_required(VERSION 3.20)
 
 project(MikuMikuWorld VERSION 1.0.0 LANGUAGES C CXX)
@@ -5,12 +11,6 @@ project(MikuMikuWorld VERSION 1.0.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-if(APPLE)
-    enable_language(OBJC)
-    enable_language(OBJCXX)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS deployment target")
-endif()
 
 file(GLOB_RECURSE MIKUMIKUWORLD_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/MikuMikuWorld/*.cpp"
@@ -51,14 +51,20 @@ else()
 endif()
 
 if(APPLE)
+    set(MAC_APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/MikuMikuWorld/mmw_icon.icns")
+
     set_target_properties(MikuMikuWorld PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "MikuMikuWorld"
+        MACOSX_BUNDLE_ICON_FILE "mmw_icon.icns"
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.crash5band.MikuMikuWorld"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
     )
+
+    target_sources(MikuMikuWorld PRIVATE ${MAC_APP_ICON})
+    set_source_files_properties(${MAC_APP_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
     set_source_files_properties(
         "${CMAKE_CURRENT_SOURCE_DIR}/MikuMikuWorld/main.cpp"

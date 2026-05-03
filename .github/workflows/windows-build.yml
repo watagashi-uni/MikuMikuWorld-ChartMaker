@@ -1,0 +1,45 @@
+name: Windows Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build x64 Release
+        run: msbuild MikuMikuWorld/MikuMikuWorld.vcxproj /p:Configuration=Release /p:Platform=x64 /m
+
+      - name: Prepare artifact
+        shell: pwsh
+        run: |
+          $outDir = "MikuMikuWorld/x64/Release"
+          if (-not (Test-Path "$outDir/MikuMikuWorld.exe")) {
+            throw "Expected build output was not found at $outDir/MikuMikuWorld.exe"
+          }
+
+          $artifactDir = "artifacts/MikuMikuWorld-windows-x64"
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          Copy-Item "$outDir/MikuMikuWorld.exe" $artifactDir -Force
+          if (Test-Path "$outDir/res") {
+            Copy-Item "$outDir/res" $artifactDir -Recurse -Force
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MikuMikuWorld-windows-x64
+          path: artifacts/MikuMikuWorld-windows-x64
+          if-no-files-found: error
