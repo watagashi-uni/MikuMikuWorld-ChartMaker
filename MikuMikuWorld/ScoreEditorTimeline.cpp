@@ -9,6 +9,7 @@
 #include "ApplicationConfiguration.h"
 #include "Rendering/Camera.h"
 #include "NoteSkin.h"
+#include "Clipboard.h"
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -16,6 +17,46 @@
 
 namespace MikuMikuWorld
 {
+	using json = nlohmann::json;
+
+	static json hiSpeedSelectionToJson(const std::vector<HiSpeedChange>& hiSpeeds)
+	{
+		json data;
+		data["hiSpeedChanges"] = json::array();
+		if (hiSpeeds.empty())
+			return data;
+
+		const int baseTick = hiSpeeds.front().tick;
+		for (const HiSpeedChange& hiSpeed : hiSpeeds)
+			data["hiSpeedChanges"].push_back({ {"tick", hiSpeed.tick - baseTick}, {"speed", hiSpeed.speed} });
+		return data;
+	}
+
+	static std::vector<HiSpeedChange> hiSpeedSelectionFromJson(std::string_view content)
+	{
+		std::vector<HiSpeedChange> hiSpeeds;
+		if (content.empty())
+			return hiSpeeds;
+
+		const json data = json::parse(content, nullptr, false);
+		if (data.is_discarded() || !jsonIO::arrayHasData(data, "hiSpeedChanges"))
+			return hiSpeeds;
+
+		for (const auto& entry : data["hiSpeedChanges"])
+		{
+			if (!entry.is_object())
+				continue;
+
+			const float speed = jsonIO::tryGetValue<float>(entry, "speed", 1.0f);
+			if (!std::isfinite(speed) || speed <= 0.0f)
+				continue;
+
+			hiSpeeds.push_back({ std::max(0, jsonIO::tryGetValue<int>(entry, "tick", 0)), speed });
+		}
+
+		return hiSpeeds;
+	}
+
 	static void drawEventControl(const EventControlDrawData& eventData)
 	{
 		ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -26,18 +67,37 @@ namespace MikuMikuWorld
 		const float frameHeight = ImGui::GetFrameHeightWithSpacing();
 		ImGui::PopStyleVar();
 		ImU32 col = eventData.color;
+		ImU32 borderCol = eventData.color;
 
 		if (!eventData.enabled)
+		{
 			col = (col & 0x00FFFFFF) | 0xAA << IM_COL32_A_SHIFT;
+			borderCol = col;
+		}
+		else if (eventData.selected)
+		{
+			const ImVec4 baseCol = ImGui::ColorConvertU32ToFloat4(col);
+			col = ImGui::ColorConvertFloat4ToU32(ImVec4(
+				std::min(1.0f, baseCol.x + 0.22f),
+				std::min(1.0f, baseCol.y + 0.22f),
+				std::min(1.0f, baseCol.z + 0.22f),
+				1.0f));
+			borderCol = selectionColor2;
+		}
 		else if (eventData.highlight)
+		{
 			col = ImGui::ColorConvertFloat4ToU32(generateHighlightColor(ImGui::ColorConvertU32ToFloat4(col)));
+			borderCol = col;
+		}
 
 		ImRect bound = { eventData.pos, eventData.pos + eventData.size };
 		ImGui::RenderFrame(bound.Min, bound.Max, col, true, 2.0f);
+		if (eventData.selected)
+			drawList->AddRect(bound.Min, bound.Max, borderCol, 2.0f, ImDrawFlags_RoundCornersAll, 2.0f);
 		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
 		ImGui::RenderTextClipped(bound.Min + framePadding, bound.Max - framePadding, eventData.txt.c_str(), NULL, &eventData.txtSize, ImGui::GetStyle().ButtonTextAlign, &bound);
 		ImGui::PopStyleColor();
-		drawList->AddLine({ eventData.timelineX, eventData.pos.y + frameHeight }, { eventData.pos.x + (eventData.pos.x < eventData.timelineX ? 0 : eventData.size.x), eventData.pos.y + frameHeight }, col, primaryLineThickness);
+		drawList->AddLine({ eventData.timelineX, eventData.pos.y + frameHeight }, { eventData.pos.x + (eventData.pos.x < eventData.timelineX ? 0 : eventData.size.x), eventData.pos.y + frameHeight }, borderCol, primaryLineThickness);
 	}
 
 	void ScoreEditorTimeline::drawFeverLine(const Fever& fever)
@@ -53,7 +113,7 @@ namespace MikuMikuWorld
 		drawList->AddLine({ x, y1 }, { x, y2 }, feverColor, primaryLineThickness);
 	}
 
-	bool ScoreEditorTimeline::eventControl(int tick, ImU32 color, const char* txt, bool fromStart, bool enabled)
+	bool ScoreEditorTimeline::eventControl(int tick, ImU32 color, const char* txt, bool fromStart, bool enabled, bool selected)
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 1, 0 });
 		const float frameHeight = ImGui::GetFrameHeightWithSpacing();
@@ -103,8 +163,8 @@ namespace MikuMikuWorld
 		ImGui::PopStyleVar();
 		ImGui::PopStyleColor(3);
 
-		bool highlight = activated || ImGui::IsItemHovered() || ImGui::IsItemActive();
-		drawEvents.push({ timelineX, {posX, posY}, itemSize + ImVec2{1, 0}, txtSize, color, txt, highlight, enabled });
+		bool highlight = selected || activated || ImGui::IsItemHovered() || ImGui::IsItemActive();
+		drawEvents.push({ timelineX, {posX, posY}, itemSize + ImVec2{1, 0}, txtSize, color, txt, highlight, selected, enabled });
 		eventControlCursor[tracks] = std::make_pair(minCursor, maxCursor);
 
 		return activated;
@@ -313,21 +373,40 @@ namespace MikuMikuWorld
 			if (ImGui::IsWindowAppearing())
 				syncNoteSpeedRatioInput(context);
 
-			if (ImGui::MenuItem(getString("delete"), ToShortcutString(config.input.deleteSelection), false, !context.selectedNotes.empty()))
-				context.deleteSelection();
+			const bool hasHiSpeedSelection = this->hasSelectedHiSpeed(context);
+			const bool hasNoteSelection = !context.selectedNotes.empty();
+			const bool hasAnySelection = hasHiSpeedSelection || hasNoteSelection;
+
+			if (ImGui::MenuItem(getString("delete"), ToShortcutString(config.input.deleteSelection), false, hasAnySelection))
+			{
+				if (!deleteSelectedHiSpeed(context))
+					context.deleteSelection();
+			}
 
 			ImGui::Separator();
-			if (ImGui::MenuItem(getString("cut"), ToShortcutString(config.input.cutSelection), false, !context.selectedNotes.empty()))
-				context.cutSelection();
+			if (ImGui::MenuItem(getString("cut"), ToShortcutString(config.input.cutSelection), false, hasAnySelection))
+			{
+				if (!cutSelectedHiSpeed(context))
+					context.cutSelection();
+			}
 
-			if (ImGui::MenuItem(getString("copy"), ToShortcutString(config.input.copySelection), false, !context.selectedNotes.empty()))
-				context.copySelection();
+			if (ImGui::MenuItem(getString("copy"), ToShortcutString(config.input.copySelection), false, hasAnySelection))
+			{
+				if (!copySelectedHiSpeed(context))
+					context.copySelection();
+			}
 
 			if (ImGui::MenuItem(getString("paste"), ToShortcutString(config.input.paste)))
-				context.paste(false);
+			{
+				if (!pasteHiSpeed(context, false))
+					context.paste(false);
+			}
 
 			if (ImGui::MenuItem(getString("flip_paste"), ToShortcutString(config.input.flipPaste)))
-				context.paste(true);
+			{
+				if (!pasteHiSpeed(context, true))
+					context.paste(true);
+			}
 
 			if (ImGui::MenuItem(getString("flip"), ToShortcutString(config.input.flip), false, !context.selectedNotes.empty()))
 				context.flipSelection();
@@ -469,7 +548,10 @@ namespace MikuMikuWorld
 					{
 						dragStart = mousePos;
 						if (!io.KeyCtrl && !io.KeyAlt && !ImGui::IsPopupOpen(IMGUI_TITLE(ICON_FA_MUSIC, "notes_timeline")))
+						{
 							context.selectedNotes.clear();
+							selectedHiSpeedTicks.clear();
+						}
 					}
 
 					if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
@@ -504,7 +586,10 @@ namespace MikuMikuWorld
 				int endTick = positionToTick(-std::min(dragStart.y, mousePos.y));
 
 				if (!io.KeyAlt && !io.KeyCtrl)
+				{
 					context.selectedNotes.clear();
+					selectedHiSpeedTicks.clear();
+				}
 
 				for (const auto& [id, note] : context.score.notes)
 				{
@@ -519,6 +604,22 @@ namespace MikuMikuWorld
 							context.selectedNotes.insert(id);
 					}
 				}
+
+				if (context.selectedNotes.empty())
+				{
+					for (const HiSpeedControlDrawData& hiSpeedRect : hiSpeedControlRects)
+					{
+						if (right > hiSpeedRect.minX && left < hiSpeedRect.maxX && isWithinRange(hiSpeedRect.tick, startTick, endTick))
+						{
+							if (io.KeyAlt)
+								selectedHiSpeedTicks.erase(hiSpeedRect.tick);
+							else
+								selectedHiSpeedTicks.insert(hiSpeedRect.tick);
+						}
+					}
+				}
+				else
+					selectedHiSpeedTicks.clear();
 
 				dragging = false;
 			}
@@ -627,6 +728,7 @@ namespace MikuMikuWorld
 			contextMenu(context);
 
 			eventControlCursor.clear();
+			hiSpeedControlRects.clear();
 
 			// Update bpm changes
 			for (int index = 0; index < context.score.tempoChanges.size(); ++index)
@@ -634,6 +736,7 @@ namespace MikuMikuWorld
 				Tempo& tempo = context.score.tempoChanges[index];
 				if (bpmControl(tempo))
 				{
+					selectedHiSpeedTicks.clear();
 					eventEdit.editIndex = index;
 					eventEdit.editBpm = tempo.bpm;
 					eventEdit.type = EventType::Bpm;
@@ -646,6 +749,7 @@ namespace MikuMikuWorld
 			{
 				if (timeSignatureControl(ts.numerator, ts.denominator, measureToTicks(ts.measure, TICKS_PER_BEAT, context.score.timeSignatures), !playing))
 				{
+					selectedHiSpeedTicks.clear();
 					eventEdit.editIndex = measure;
 					eventEdit.editTimeSignatureNumerator = ts.numerator;
 					eventEdit.editTimeSignatureDenominator = ts.denominator;
@@ -658,7 +762,7 @@ namespace MikuMikuWorld
 			for (int index = 0; index < context.score.hiSpeedChanges.size(); ++index)
 			{
 				HiSpeedChange& hiSpeed = context.score.hiSpeedChanges[index];
-				if (hiSpeedControl(hiSpeed))
+				if (hiSpeedControl(context, hiSpeed))
 				{
 					eventEdit.editIndex = index;
 					eventEdit.setEditHispeed(hiSpeed.speed);
@@ -684,6 +788,7 @@ namespace MikuMikuWorld
 			drawFeverLine(context.score.fever);
 			if (feverControl(context.score.fever))
 			{
+				selectedHiSpeedTicks.clear();
 				eventEdit.editIndex = -1;
 				eventEdit.type = EventType::Fever;
 				ImGui::OpenPopup("edit_event");
@@ -694,6 +799,7 @@ namespace MikuMikuWorld
 			{
 				if (skillControl(context.score.skills.at(index)))
 				{
+					selectedHiSpeedTicks.clear();
 					eventEdit.editIndex = index;
 					eventEdit.type = EventType::Skill;
 					ImGui::OpenPopup("edit_event");
@@ -714,6 +820,8 @@ namespace MikuMikuWorld
 			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !isHoveringNote && mouseInTimeline && !playing && !pasting &&
 				!UI::isAnyPopupOpen() && currentMode == TimelineMode::Select && ImGui::IsWindowFocused())
 			{
+				if (!ImGui::IsAnyItemHovered())
+					selectedHiSpeedTicks.clear();
 				context.currentTick = hoverTick;
 				lastSelectedTick = context.currentTick;
 			}
@@ -1268,7 +1376,7 @@ namespace MikuMikuWorld
 			break;
 
 		case TimelineMode::InsertHiSpeed:
-			hiSpeedControl(hoverTick, edit.hiSpeed, false);
+			eventControl(hoverTick, speedColor, IO::formatString("%sx", IO::formatFixedFloatTrimmed(edit.hiSpeed)).c_str(), false, false);
 			break;
 		default:
 			drawNote(inputNotes.tap, renderer, hoverTint);
@@ -1474,6 +1582,7 @@ namespace MikuMikuWorld
 					if (!io.KeyCtrl && !io.KeyAlt && !context.isNoteSelected(note))
 						context.selectedNotes.clear();
 
+					selectedHiSpeedTicks.clear();
 					context.selectedNotes.insert(note.ID);
 
 					if (io.KeyAlt && context.isNoteSelected(note))
@@ -2095,17 +2204,50 @@ namespace MikuMikuWorld
 		return eventControl(tick, feverColor, start ? feverStartText : feverEndText, true, enabled);
 	}
 
-	bool ScoreEditorTimeline::hiSpeedControl(const HiSpeedChange& hiSpeed)
+	bool ScoreEditorTimeline::hiSpeedControl(ScoreContext& context, const HiSpeedChange& hiSpeed)
 	{
-		return hiSpeedControl(hiSpeed.tick, hiSpeed.speed, !playing);
+		return hiSpeedControl(context, hiSpeed.tick, hiSpeed.speed, !playing);
 	}
 
-	bool ScoreEditorTimeline::hiSpeedControl(int tick, float speed, bool enabled)
+	bool ScoreEditorTimeline::hiSpeedControl(ScoreContext& context, int tick, float speed, bool enabled)
 	{
 		std::string txt = IO::formatString("%sx", IO::formatFixedFloatTrimmed(speed));
-		float dpiScale = ImGui::GetMainViewport()->DpiScale;
-		Vector2 pos{ getTimelineEndX() + (115 * dpiScale), position.y - tickToPosition(tick) + visualOffset};
-		return eventControl(tick, speedColor, txt.c_str(), false, enabled);
+		eventControl(tick, speedColor, txt.c_str(), false, enabled, selectedHiSpeedTicks.find(tick) != selectedHiSpeedTicks.end() && !playing);
+		const ImVec2 rectMin = ImGui::GetItemRectMin();
+		const ImVec2 rectMax = ImGui::GetItemRectMax();
+		hiSpeedControlRects.push_back({ tick, rectMin.x - position.x, rectMax.x - position.x });
+
+		if (enabled && ImGui::IsItemHovered())
+		{
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			{
+				const ImGuiIO& io = ImGui::GetIO();
+				if (!context.selectedNotes.empty())
+				{
+					selectedHiSpeedTicks.clear();
+					return false;
+				}
+
+				if (!io.KeyCtrl && !io.KeyAlt)
+				{
+					selectedHiSpeedTicks.clear();
+					selectedHiSpeedTicks.insert(tick);
+				}
+				else if (io.KeyAlt)
+				{
+					selectedHiSpeedTicks.erase(tick);
+				}
+				else
+				{
+					selectedHiSpeedTicks.insert(tick);
+				}
+			}
+
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+				return true;
+		}
+
+		return false;
 	}
 
 	void ScoreEditorTimeline::eventEditor(ScoreContext& context)
@@ -2237,6 +2379,7 @@ namespace MikuMikuWorld
 				{
 					ImGui::CloseCurrentPopup();
 					Score prev = context.score;
+					selectedHiSpeedTicks.erase(hiSpeed.tick);
 					context.score.hiSpeedChanges.erase(context.score.hiSpeedChanges.begin() + eventEdit.editIndex);
 					context.pushHistory("Remove hi-speed change", prev, context.score);
 				}
@@ -2581,6 +2724,111 @@ namespace MikuMikuWorld
 				}
 			}
 		}
+	}
+
+	std::vector<int> ScoreEditorTimeline::getSelectedHiSpeedIndices(const ScoreContext& context) const
+	{
+		std::vector<int> indices;
+		if (!context.selectedNotes.empty() || selectedHiSpeedTicks.empty())
+			return indices;
+
+		for (int index = 0; index < context.score.hiSpeedChanges.size(); ++index)
+			if (selectedHiSpeedTicks.find(context.score.hiSpeedChanges[index].tick) != selectedHiSpeedTicks.end())
+				indices.push_back(index);
+
+		return indices;
+	}
+
+	bool ScoreEditorTimeline::hasSelectedHiSpeed(const ScoreContext& context) const
+	{
+		return !getSelectedHiSpeedIndices(context).empty();
+	}
+
+	bool ScoreEditorTimeline::copySelectedHiSpeed(const ScoreContext& context)
+	{
+		const std::vector<int> indices = getSelectedHiSpeedIndices(context);
+		if (indices.empty())
+			return false;
+
+		std::vector<HiSpeedChange> hiSpeeds;
+		hiSpeeds.reserve(indices.size());
+		for (int index : indices)
+			hiSpeeds.push_back(context.score.hiSpeedChanges[index]);
+
+		Clipboard::store(hiSpeedSelectionToJson(hiSpeeds).dump());
+		return true;
+	}
+
+	bool ScoreEditorTimeline::deleteSelectedHiSpeed(ScoreContext& context)
+	{
+		const std::vector<int> indices = getSelectedHiSpeedIndices(context);
+		if (indices.empty())
+			return false;
+
+		Score prev = context.score;
+		context.score.hiSpeedChanges.erase(
+			std::remove_if(context.score.hiSpeedChanges.begin(), context.score.hiSpeedChanges.end(),
+				[this](const HiSpeedChange& hiSpeed)
+				{
+					return selectedHiSpeedTicks.find(hiSpeed.tick) != selectedHiSpeedTicks.end();
+				}),
+			context.score.hiSpeedChanges.end());
+		selectedHiSpeedTicks.clear();
+		context.pushHistory("Remove hi-speed change", prev, context.score);
+		return true;
+	}
+
+	bool ScoreEditorTimeline::cutSelectedHiSpeed(ScoreContext& context)
+	{
+		if (!copySelectedHiSpeed(context))
+			return false;
+
+		return deleteSelectedHiSpeed(context);
+	}
+
+	bool ScoreEditorTimeline::pasteHiSpeed(ScoreContext& context, bool flip)
+	{
+		(void)flip;
+
+		const std::vector<HiSpeedChange> hiSpeeds = hiSpeedSelectionFromJson(Clipboard::get());
+		if (hiSpeeds.empty())
+			return false;
+
+		Score prev = context.score;
+		bool changed = false;
+		std::unordered_set<int> pastedTicks;
+
+		for (const HiSpeedChange& hiSpeed : hiSpeeds)
+		{
+			const int targetTick = std::max(0, context.currentTick + hiSpeed.tick);
+			auto it = std::find_if(context.score.hiSpeedChanges.begin(), context.score.hiSpeedChanges.end(),
+				[targetTick](const HiSpeedChange& current) { return current.tick == targetTick; });
+
+			if (it == context.score.hiSpeedChanges.end())
+			{
+				context.score.hiSpeedChanges.push_back({ targetTick, hiSpeed.speed });
+				changed = true;
+			}
+			else if (std::abs(it->speed - hiSpeed.speed) > 0.0001f)
+			{
+				it->speed = hiSpeed.speed;
+				changed = true;
+			}
+
+			pastedTicks.insert(targetTick);
+		}
+
+		context.selectedNotes.clear();
+		selectedHiSpeedTicks = pastedTicks;
+
+		if (changed)
+		{
+			std::sort(context.score.hiSpeedChanges.begin(), context.score.hiSpeedChanges.end(),
+				[](const HiSpeedChange& left, const HiSpeedChange& right) { return left.tick < right.tick; });
+			context.pushHistory("Paste hi-speed change", prev, context.score);
+		}
+
+		return true;
 	}
 
 	void ScoreEditorTimeline::drawWaveform(const ScoreContext& context)

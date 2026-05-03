@@ -97,11 +97,11 @@ namespace MikuMikuWorld
 			if (!preview.isFullWindow())
 			{
 				if (ImGui::IsAnyPressed(config.input.selectAll)) context.selectAll();
-				if (ImGui::IsAnyPressed(config.input.deleteSelection)) context.deleteSelection();
-				if (ImGui::IsAnyPressed(config.input.cutSelection)) context.cutSelection();
-				if (ImGui::IsAnyPressed(config.input.copySelection)) context.copySelection();
-				if (ImGui::IsAnyPressed(config.input.paste)) context.paste(false);
-				if (ImGui::IsAnyPressed(config.input.flipPaste)) context.paste(true);
+				if (ImGui::IsAnyPressed(config.input.deleteSelection) && !timeline.deleteSelectedHiSpeed(context)) context.deleteSelection();
+				if (ImGui::IsAnyPressed(config.input.cutSelection) && !timeline.cutSelectedHiSpeed(context)) context.cutSelection();
+				if (ImGui::IsAnyPressed(config.input.copySelection) && !timeline.copySelectedHiSpeed(context)) context.copySelection();
+				if (ImGui::IsAnyPressed(config.input.paste) && !timeline.pasteHiSpeed(context, false)) context.paste(false);
+				if (ImGui::IsAnyPressed(config.input.flipPaste) && !timeline.pasteHiSpeed(context, true)) context.paste(true);
 				if (ImGui::IsAnyPressed(config.input.cancelPaste)) context.cancelPaste();
 				if (ImGui::IsAnyPressed(config.input.flip)) context.flipSelection();
 				if (ImGui::IsAnyPressed(config.input.undo)) context.undo();
@@ -483,17 +483,31 @@ namespace MikuMikuWorld
 				context.redo();
 
 			ImGui::Separator();
-			if (ImGui::MenuItem(getString("delete"), ToShortcutString(config.input.deleteSelection), false, context.selectedNotes.size()))
-				context.deleteSelection();
+			const bool hasHiSpeedSelection = timeline.hasSelectedHiSpeed(context);
+			const bool hasAnySelection = hasHiSpeedSelection || context.selectedNotes.size();
+			if (ImGui::MenuItem(getString("delete"), ToShortcutString(config.input.deleteSelection), false, hasAnySelection))
+			{
+				if (!timeline.deleteSelectedHiSpeed(context))
+					context.deleteSelection();
+			}
 
-			if (ImGui::MenuItem(getString("cut"), ToShortcutString(config.input.cutSelection), false, context.selectedNotes.size()))
-				context.cutSelection();
+			if (ImGui::MenuItem(getString("cut"), ToShortcutString(config.input.cutSelection), false, hasAnySelection))
+			{
+				if (!timeline.cutSelectedHiSpeed(context))
+					context.cutSelection();
+			}
 
-			if (ImGui::MenuItem(getString("copy"), ToShortcutString(config.input.copySelection), false, context.selectedNotes.size()))
-				context.copySelection();
+			if (ImGui::MenuItem(getString("copy"), ToShortcutString(config.input.copySelection), false, hasAnySelection))
+			{
+				if (!timeline.copySelectedHiSpeed(context))
+					context.copySelection();
+			}
 
 			if (ImGui::MenuItem(getString("paste"), ToShortcutString(config.input.paste)))
-				context.paste(false);
+			{
+				if (!timeline.pasteHiSpeed(context, false))
+					context.paste(false);
+			}
 
 			ImGui::Separator();
 			if (ImGui::MenuItem(getString("select_all"), ToShortcutString(config.input.selectAll)))
@@ -660,14 +674,25 @@ namespace MikuMikuWorld
 
 		UI::toolbarSeparator();
 
-		if (UI::toolbarButton(ICON_FA_CUT, getString("cut"), ToShortcutString(config.input.cutSelection), context.selectedNotes.size() > 0))
-			context.cutSelection();
+		const bool hasHiSpeedSelection = timeline.hasSelectedHiSpeed(context);
+		const bool hasAnySelection = hasHiSpeedSelection || context.selectedNotes.size() > 0;
+		if (UI::toolbarButton(ICON_FA_CUT, getString("cut"), ToShortcutString(config.input.cutSelection), hasAnySelection))
+		{
+			if (!timeline.cutSelectedHiSpeed(context))
+				context.cutSelection();
+		}
 
-		if (UI::toolbarButton(ICON_FA_COPY, getString("copy"), ToShortcutString(config.input.copySelection), context.selectedNotes.size() > 0))
-			context.copySelection();
+		if (UI::toolbarButton(ICON_FA_COPY, getString("copy"), ToShortcutString(config.input.copySelection), hasAnySelection))
+		{
+			if (!timeline.copySelectedHiSpeed(context))
+				context.copySelection();
+		}
 
 		if (UI::toolbarButton(ICON_FA_PASTE, getString("paste"), ToShortcutString(config.input.paste)))
-			context.paste(false);
+		{
+			if (!timeline.pasteHiSpeed(context, false))
+				context.paste(false);
+		}
 
 		UI::toolbarSeparator();
 

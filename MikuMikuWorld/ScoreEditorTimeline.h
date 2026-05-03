@@ -61,6 +61,7 @@ namespace MikuMikuWorld
 		ImU32 color;
 		std::string txt;
 		bool highlight;
+		bool selected;
 		bool enabled;
 	};
 
@@ -168,12 +169,21 @@ namespace MikuMikuWorld
 
 		} noteTransformOrigin;
 
+		struct HiSpeedControlDrawData
+		{
+			int tick{};
+			float minX{};
+			float maxX{};
+		};
+
 		std::map<int, std::pair<float, float>> eventControlCursor;
 		std::stack<EventControlDrawData> drawEvents;
 		std::vector<StepDrawData> drawSteps;
 		std::vector<SpeedRatioLabelDrawData> drawSpeedRatioLabels;
+		std::vector<HiSpeedControlDrawData> hiSpeedControlRects;
 		std::unordered_set<std::string> playingNoteSounds;
 		std::array<char, 32> noteSpeedRatioInput{};
+		std::unordered_set<int> selectedHiSpeedTicks;
 		static constexpr float audioLookAhead = 0.05f;
 
 		Debug::DebugRenderStats renderStats;
@@ -193,7 +203,7 @@ namespace MikuMikuWorld
 		void drawFlickArrow(const Note& note, Renderer* renderer, const Color& tint, const int offsetTick = 0, const int offsetLane = 0);
 		void drawSpeedRatioLabel(const Note& note, const int offsetTick = 0, const int offsetLane = 0);
 		void drawNote(const Note& note, Renderer* renderer, const Color& tint, const int offsetTick = 0, const int offsetLane = 0);
-		bool eventControl(int tick, ImU32 color, const char* txt, bool fromStart, bool enabled);
+		bool eventControl(int tick, ImU32 color, const char* txt, bool fromStart, bool enabled, bool selected = false);
 		bool noteControl(ScoreContext& context, const ImVec2& pos, const ImVec2& sz, const char* id, ImGuiMouseCursor cursor);
 		bool bpmControl(const Tempo& tempo);
 		bool bpmControl(float bpm, int tick, bool enabled);
@@ -202,8 +212,8 @@ namespace MikuMikuWorld
 		bool skillControl(int tick, bool enabled);
 		bool feverControl(const Fever& fever);
 		bool feverControl(int tick, bool start, bool enabled);
-		bool hiSpeedControl(const HiSpeedChange& hiSpeed);
-		bool hiSpeedControl(int tick, float speed, bool enabled);
+		bool hiSpeedControl(ScoreContext& context, const HiSpeedChange& hiSpeed);
+		bool hiSpeedControl(ScoreContext& context, int tick, float speed, bool enabled);
 
 		void drawInputNote(Renderer* renderer);
 		void previewInput(EditArgs& edit, Renderer* renderer);
@@ -221,6 +231,7 @@ namespace MikuMikuWorld
 		bool applyNoteSpeedRatioInput(ScoreContext& context);
 
 		void contextMenu(ScoreContext& context);
+		std::vector<int> getSelectedHiSpeedIndices(const ScoreContext& context) const;
 
 		int getStopTick(const Score& score) const;
 		float getStopTime(const ScoreContext& context);
@@ -295,6 +306,11 @@ namespace MikuMikuWorld
 		void insertSkill(ScoreContext& context, int tick);
 		void beginInsertFever(ScoreContext& context, int tick);
 		void endInsertFever(ScoreContext& context, int tick);
+		bool hasSelectedHiSpeed(const ScoreContext& context) const;
+		bool copySelectedHiSpeed(const ScoreContext& context);
+		bool deleteSelectedHiSpeed(ScoreContext& context);
+		bool cutSelectedHiSpeed(ScoreContext& context);
+		bool pasteHiSpeed(ScoreContext& context, bool flip);
 
 		ScoreEditorTimeline();
 	};
