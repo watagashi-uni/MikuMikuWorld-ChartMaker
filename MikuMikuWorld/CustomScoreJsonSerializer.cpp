@@ -627,7 +627,7 @@ namespace MikuMikuWorld
 					const int tick = toInt(event, "ticks");
 					if (type == 0)
 						score.tempoChanges.push_back({ tick, toFloat(event, "changeValue", 120.0f) });
-					else if (type == 2)
+					else if (type == 1)
 						score.hiSpeedChanges.push_back({ tick, toFloat(event, "changeValue", 1.0f) });
 				}
 			}
@@ -689,14 +689,14 @@ namespace MikuMikuWorld
 		events.reserve(1 + score.timeSignatures.size() + score.tempoChanges.size() + score.hiSpeedChanges.size());
 
 		int nextEventId = 1;
-		if (score.hiSpeedChanges.empty())
+		if (score.hiSpeedChanges.empty() || score.hiSpeedChanges.front().tick != 0)
 		{
 			events.push_back({ nextEventId++, 1, 0, 1.0f });
 		}
-		else
+
+		for (const auto& hiSpeed : score.hiSpeedChanges)
 		{
-			for (const auto& hiSpeed : score.hiSpeedChanges)
-				events.push_back({ nextEventId++, 1, hiSpeed.tick, roundFloatForJson(hiSpeed.speed) });
+			events.push_back({ nextEventId++, 1, hiSpeed.tick, roundFloatForJson(hiSpeed.speed) });
 		}
 
 		if (score.timeSignatures.empty())
