@@ -40,6 +40,7 @@ namespace MikuMikuWorld
 			vsync = jsonIO::tryGetValue<bool>(window, "vsync", true);
 			showFPS = jsonIO::tryGetValue<bool>(window, "show_fps", false);
 			fullScreen = jsonIO::tryGetValue<bool>(window, "fullscreen", false);
+			hideStartupWarning = jsonIO::tryGetValue<bool>(window, "hide_startup_warning", false);
 
 			windowPos = jsonIO::tryGetValue(window, "position", Vector2{});
 			if (windowPos.x <= 0) windowPos.x = 150;
@@ -169,6 +170,7 @@ namespace MikuMikuWorld
 		config["window"]["vsync"] = vsync;
 		config["window"]["show_fps"] = showFPS;
 		config["window"]["fullscreen"] = fullScreen;
+		config["window"]["hide_startup_warning"] = hideStartupWarning;
 
 		config["timeline"] = {
 			{"lane_width", timelineWidth},
@@ -268,6 +270,8 @@ namespace MikuMikuWorld
 		fullScreen = false;
 		maximized = false;
 		vsync = true;
+		showFPS = false;
+		hideStartupWarning = false;
 		accentColor = 1;
 		userColor = Color(0.2f, 0.2f, 0.2f, 1.0f);
 		language = "auto";

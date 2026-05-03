@@ -6,6 +6,7 @@
 #include "ApplicationConfiguration.h"
 #include "ScoreSerializer.h"
 #include "NoteSkin.h"
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 
@@ -88,6 +89,7 @@ namespace MikuMikuWorld
 		imgui->applyAccentColor(config.accentColor);
 
 		loadResources();
+		startupWarningShouldOpen = !config.hideStartupWarning && startupWarningTextureIndex >= 0;
 
 		editor = std::make_unique<ScoreEditor>();
 		editor->loadPresets();
@@ -382,11 +384,69 @@ namespace MikuMikuWorld
 			ImGui::EndMainMenuBar();
 		}
 
+		updateStartupWarningDialog();
+
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		imgui->draw(window);
 		glfwSwapBuffers(window);
+	}
+
+	void Application::updateStartupWarningDialog()
+	{
+		if (config.hideStartupWarning || startupWarningTextureIndex < 0)
+			return;
+
+		if (startupWarningShouldOpen)
+		{
+			startupWarningDontShowAgain = false;
+			ImGui::OpenPopup(MODAL_TITLE("startup_warning"));
+			startupWarningShouldOpen = false;
+		}
+
+		const Texture& warningTexture = ResourceManager::textures[startupWarningTextureIndex];
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		const ImVec2 viewportSize = viewport->WorkSize;
+		const float maxImageWidth = std::min(viewportSize.x * 0.68f, 980.0f);
+		const float maxImageHeight = std::min(viewportSize.y * 0.58f, 620.0f);
+		const float widthScale = maxImageWidth / static_cast<float>(warningTexture.getWidth());
+		const float heightScale = maxImageHeight / static_cast<float>(warningTexture.getHeight());
+		const float imageScale = std::min(1.0f, std::min(widthScale, heightScale));
+		const ImVec2 imageSize{
+			warningTexture.getWidth() * imageScale,
+			warningTexture.getHeight() * imageScale
+		};
+
+		ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowViewport(viewport->ID);
+		bool popupOpen = true;
+		if (ImGui::BeginPopupModal(MODAL_TITLE("startup_warning"), &popupOpen, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			bool shouldClose = false;
+
+			ImGui::SetCursorPosX(std::max((ImGui::GetContentRegionAvail().x - imageSize.x) * 0.5f, 0.0f));
+			ImGui::Image((ImTextureID)(intptr_t)warningTexture.getID(), imageSize);
+
+			ImGui::Spacing();
+			ImGui::Checkbox(getString("startup_warning_hide"), &startupWarningDontShowAgain);
+			ImGui::Spacing();
+
+			if (ImGui::Button(getString("startup_warning_confirm"), { ImGui::GetContentRegionAvail().x, 0.0f }))
+				shouldClose = true;
+
+			if (!popupOpen)
+				shouldClose = true;
+
+			if (shouldClose)
+			{
+				config.hideStartupWarning = startupWarningDontShowAgain;
+				config.write(userDataDir + APP_CONFIG_FILENAME);
+				ImGui::CloseCurrentPopup();
+			}
+
+			ImGui::EndPopup();
+		}
 	}
 
 	void Application::loadResources()
@@ -412,6 +472,10 @@ namespace MikuMikuWorld
 		ResourceManager::loadTexture(editorAssetsDir + "timeline_tools.png");
 		ResourceManager::loadTexture(editorAssetsDir + "note_stats.png");
 		ResourceManager::loadTexture(editorAssetsDir + "stage.png");
+
+		const std::string startupWarningImage = appDir + "res/warning.jpg";
+		ResourceManager::loadTexture(startupWarningImage);
+		startupWarningTextureIndex = ResourceManager::getTextureByFilename(startupWarningImage);
 
 		ResourceManager::loadTransforms(appDir + "res/effect/transform.txt");
 

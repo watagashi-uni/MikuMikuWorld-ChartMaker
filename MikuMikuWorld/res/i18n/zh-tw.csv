@@ -47,6 +47,9 @@ ask_save, 是否要儲存譜面？
 warn_unsaved, 任何未儲存的變更都將遺失。
 save_changes, 儲存變更
 discard_changes, 放棄變更
+startup_warning, 警告
+startup_warning_hide, 不再顯示這個警告
+startup_warning_confirm, 我已了解
 score_file, 譜面文件
 export_successful, 已成功匯出
 unknown_file_format, 未知的檔案類型

@@ -56,6 +56,9 @@ namespace MikuMikuWorld
 		std::unique_ptr<ScoreEditor> editor;
 		std::unique_ptr<ImGuiManager> imgui;
 		UnsavedChangesDialog unsavedChangesDialog;
+		int startupWarningTextureIndex{ -1 };
+		bool startupWarningShouldOpen{ false };
+		bool startupWarningDontShowAgain{ false };
 
 		bool initialized{ false };
 		bool shouldPickScore{ false };
@@ -68,6 +71,7 @@ namespace MikuMikuWorld
 
 		Result initOpenGL();
 		std::string getVersion();
+		void updateStartupWarningDialog();
 
 	public:
 		static WindowState windowState;

@@ -71,6 +71,7 @@ namespace MikuMikuWorld
 		bool fullScreen;
 		bool vsync;
 		bool showFPS;
+		bool hideStartupWarning;
 		int accentColor;
 		Color userColor;
 		BaseTheme baseTheme;

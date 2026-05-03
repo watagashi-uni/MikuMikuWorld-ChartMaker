@@ -47,6 +47,9 @@ ask_save, 譜面を保存しますか？
 warn_unsaved, 保存されていない変更は失われます。
 save_changes, 保存する
 discard_changes, 保存しない
+startup_warning, 警告
+startup_warning_hide, 今後この警告を表示しない
+startup_warning_confirm, 確認しました
 score_file, 譜面ファイル
 export_successful, エクスポートが完了しました
 unknown_file_format, 不明なファイル形式
