@@ -1,10 +1,8 @@
+cmake_minimum_required(VERSION 3.20)
+
 if(APPLE)
-    enable_language(OBJC)
-    enable_language(OBJCXX)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS deployment target")
 endif()
-
-cmake_minimum_required(VERSION 3.20)
 
 project(MikuMikuWorld VERSION 1.0.0 LANGUAGES C CXX)
 
@@ -51,6 +49,8 @@ else()
 endif()
 
 if(APPLE)
+    enable_language(OBJC)
+    enable_language(OBJCXX)
     set(MAC_APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/MikuMikuWorld/mmw_icon.icns")
 
     set_target_properties(MikuMikuWorld PROPERTIES
