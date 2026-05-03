@@ -426,6 +426,12 @@ namespace MikuMikuWorld
 			return std::strtod(IO::formatFixedFloatTrimmed(value, 6).c_str(), nullptr);
 		}
 
+		float speedRatioAtTick(int tick, const std::vector<HiSpeedChange>& hiSpeedChanges)
+		{
+			const int hiSpeedIndex = findHighSpeedChange(tick, hiSpeedChanges);
+			return hiSpeedIndex == -1 ? 1.0f : hiSpeedChanges[hiSpeedIndex].speed;
+		}
+
 		RawNote readNote(const json& js)
 		{
 			return RawNote{
@@ -725,8 +731,7 @@ namespace MikuMikuWorld
 		}
 		else
 		{
-			for (const auto& hiSpeed : score.hiSpeedChanges)
-				events.push_back({ nextEventId++, 2, hiSpeed.tick, roundFloatForJson(hiSpeed.speed) });
+			events.push_back({ nextEventId++, 2, 0, 1.0f });
 		}
 
 		std::vector<ExportNote> notes;
@@ -738,7 +743,9 @@ namespace MikuMikuWorld
 			if (note.getType() != NoteType::Tap)
 				continue;
 
-			notes.push_back(makeTapExportNote(note, nextNoteId++));
+			ExportNote exported = makeTapExportNote(note, nextNoteId++);
+			exported.speedRatio = roundFloatForJson(speedRatioAtTick(note.tick, score.hiSpeedChanges));
+			notes.push_back(std::move(exported));
 		}
 
 		for (const auto& [_, hold] : score.holdNotes)
@@ -751,7 +758,7 @@ namespace MikuMikuWorld
 			for (int& id : ids)
 				id = nextNoteId++;
 
-			notes.push_back(makeChainEndpointExportNote(
+			ExportNote startExport = makeChainEndpointExportNote(
 				start,
 				hold.startType,
 				true,
@@ -759,23 +766,27 @@ namespace MikuMikuWorld
 				-1,
 				chainSize > 1 ? ids[1] : -1,
 				hold.start.ease
-			));
+			);
+			startExport.speedRatio = roundFloatForJson(speedRatioAtTick(start.tick, score.hiSpeedChanges));
+			notes.push_back(std::move(startExport));
 
 			for (size_t index = 0; index < hold.steps.size(); ++index)
 			{
 				const HoldStep& step = hold.steps[index];
 				const Note& stepNote = score.notes.at(step.ID);
-				notes.push_back(makeChainMidExportNote(
+				ExportNote stepExport = makeChainMidExportNote(
 					stepNote,
 					step,
 					isGuide,
 					ids[index + 1],
 					ids[index],
 					ids[index + 2]
-				));
+				);
+				stepExport.speedRatio = roundFloatForJson(speedRatioAtTick(stepNote.tick, score.hiSpeedChanges));
+				notes.push_back(std::move(stepExport));
 			}
 
-			notes.push_back(makeChainEndpointExportNote(
+			ExportNote endExport = makeChainEndpointExportNote(
 				end,
 				hold.endType,
 				false,
@@ -783,7 +794,9 @@ namespace MikuMikuWorld
 				ids[ids.size() - 2],
 				-1,
 				EaseType::Linear
-			));
+			);
+			endExport.speedRatio = roundFloatForJson(speedRatioAtTick(end.tick, score.hiSpeedChanges));
+			notes.push_back(std::move(endExport));
 		}
 
 		std::stable_sort(notes.begin(), notes.end(), [](const ExportNote& left, const ExportNote& right)
