@@ -341,10 +341,17 @@ namespace MikuMikuWorld
 				return raw;
 			}
 
-			if (isStart && note.flick == FlickType::None && !note.friction)
+			if (isStart)
 			{
-				raw.category = 6;
-				raw.noteBaseType = 8;
+				raw.category = 1;
+				raw.noteBaseType = 2;
+				return raw;
+			}
+
+			if (note.flick == FlickType::None && !note.friction)
+			{
+				raw.category = 1;
+				raw.noteBaseType = 1;
 				return raw;
 			}
 
