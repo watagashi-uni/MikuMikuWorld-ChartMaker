@@ -47,6 +47,7 @@ namespace MikuMikuWorld
 			UI::addStringProperty(getString("title"), context.workingData.title);
 			UI::addStringProperty(getString("designer"), context.workingData.designer);
 			UI::addStringProperty(getString("artist"), context.workingData.artist);
+			UI::addIntProperty(getString("music_id"), context.workingData.musicId);
 
 			std::string jacketFile = context.workingData.jacket.getFilename();
 

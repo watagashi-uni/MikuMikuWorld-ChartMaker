@@ -15,6 +15,7 @@
 namespace MikuMikuWorld
 {
 	using json = nlohmann::json;
+	using ordered_json = nlohmann::ordered_json;
 
 	namespace custom_score_json
 	{
@@ -32,6 +33,34 @@ namespace MikuMikuWorld
 			int noteLineType{};
 			bool critical{};
 			bool isSkip{};
+		};
+
+		struct ExportEvent
+		{
+			int id{};
+			int eventType{};
+			int ticks{};
+			json changeValue{};
+		};
+
+		struct ExportNote
+		{
+			int id{};
+			int ticks{};
+			int laneStart{};
+			int laneEnd{};
+			int category{};
+			int type{};
+			float speedRatio{ 1.0f };
+			int noteLineType{};
+			int noteBaseType{};
+			int previousConnectionId{ -1 };
+			int nextConnectionId{ -1 };
+			int direction{};
+			bool isSkip{};
+			bool isSingle{};
+			bool isConnectedFirst{};
+			bool isConnectedLast{};
 		};
 
 		enum class SlideKind
@@ -197,6 +226,197 @@ namespace MikuMikuWorld
 				return EaseType::EaseOut;
 
 			return EaseType::Linear;
+		}
+
+		int lineTypeFromEase(EaseType ease)
+		{
+			if (ease == EaseType::EaseOut)
+				return 1;
+
+			if (ease == EaseType::EaseIn)
+				return 2;
+
+			return 0;
+		}
+
+		int directionFromFlick(FlickType flick)
+		{
+			if (flick == FlickType::Left)
+				return 1;
+
+			if (flick == FlickType::Right)
+				return 2;
+
+			return 0;
+		}
+
+		int laneEndFrom(const Note& note)
+		{
+			return std::clamp(note.lane + note.width - 1, MIN_LANE, MAX_LANE);
+		}
+
+		ExportNote makeBaseExportNote(const Note& note, int id)
+		{
+			return ExportNote{
+				id,
+				note.tick,
+				std::clamp(note.lane, MIN_LANE, MAX_LANE),
+				laneEndFrom(note),
+				0,
+				note.critical ? 1 : 0,
+				1.0f,
+				0,
+				1,
+				-1,
+				-1,
+				directionFromFlick(note.flick),
+				false,
+				true,
+				false,
+				false
+			};
+		}
+
+		void applyTapLikeCategory(ExportNote& raw, const Note& note)
+		{
+			if (note.friction && note.flick != FlickType::None)
+			{
+				raw.category = 8;
+				raw.noteBaseType = 4;
+			}
+			else if (note.friction)
+			{
+				raw.category = 4;
+				raw.noteBaseType = 11;
+			}
+			else if (note.flick != FlickType::None)
+			{
+				raw.category = 3;
+				raw.noteBaseType = 3;
+			}
+			else
+			{
+				raw.category = 0;
+				raw.noteBaseType = 1;
+			}
+		}
+
+		ExportNote makeTapExportNote(const Note& note, int id)
+		{
+			ExportNote raw = makeBaseExportNote(note, id);
+			applyTapLikeCategory(raw, note);
+			return raw;
+		}
+
+		ExportNote makeChainEndpointExportNote(
+			const Note& note,
+			HoldNoteType endpointType,
+			bool isStart,
+			int id,
+			int previousId,
+			int nextId,
+			EaseType ease)
+		{
+			ExportNote raw = makeBaseExportNote(note, id);
+			raw.previousConnectionId = previousId;
+			raw.nextConnectionId = nextId;
+			raw.isSingle = false;
+			raw.isConnectedFirst = isStart;
+			raw.isConnectedLast = !isStart && nextId == -1;
+			raw.noteLineType = lineTypeFromEase(ease);
+
+			if (endpointType == HoldNoteType::Guide)
+			{
+				raw.category = 9;
+				raw.noteBaseType = isStart ? 10 : 13;
+				raw.direction = 0;
+				return raw;
+			}
+
+			if (endpointType == HoldNoteType::Hidden)
+			{
+				raw.category = isStart ? 7 : 5;
+				raw.noteBaseType = isStart ? 9 : 12;
+				raw.direction = 0;
+				return raw;
+			}
+
+			if (isStart && note.flick == FlickType::None && !note.friction)
+			{
+				raw.category = 6;
+				raw.noteBaseType = 8;
+				return raw;
+			}
+
+			applyTapLikeCategory(raw, note);
+			return raw;
+		}
+
+		ExportNote makeChainMidExportNote(
+			const Note& note,
+			const HoldStep& step,
+			bool isGuide,
+			int id,
+			int previousId,
+			int nextId)
+		{
+			ExportNote raw = makeBaseExportNote(note, id);
+			raw.previousConnectionId = previousId;
+			raw.nextConnectionId = nextId;
+			raw.noteLineType = lineTypeFromEase(step.ease);
+			raw.isSingle = false;
+
+			if (isGuide || step.type == HoldStepType::Hidden)
+			{
+				raw.category = isGuide ? 11 : 13;
+				raw.noteBaseType = isGuide ? 14 : 6;
+				raw.direction = 0;
+				return raw;
+			}
+
+			raw.category = 2;
+			raw.noteBaseType = 5;
+			raw.isSkip = step.type == HoldStepType::Skip;
+			return raw;
+		}
+
+		ordered_json toEventJson(const ExportEvent& event, int jsonId)
+		{
+			ordered_json value;
+			value["$id"] = std::to_string(jsonId);
+			value["id"] = event.id;
+			value["eventType"] = event.eventType;
+			value["ticks"] = event.ticks;
+			value["changeValue"] = event.changeValue;
+			return value;
+		}
+
+		ordered_json toNoteJson(const ExportNote& note, int jsonId)
+		{
+			ordered_json value;
+			value["$id"] = std::to_string(jsonId);
+			value["id"] = note.id;
+			value["ticks"] = note.ticks;
+			value["laneStart"] = note.laneStart;
+			value["laneEnd"] = note.laneEnd;
+			value["category"] = note.category;
+			value["type"] = note.type;
+			value["speedRatio"] = note.speedRatio;
+			value["noteLineType"] = note.noteLineType;
+			value["noteBaseType"] = note.noteBaseType;
+			value["previousConnectionId"] = note.previousConnectionId;
+			value["nextConnectionId"] = note.nextConnectionId;
+			value["direction"] = note.direction;
+			value["isSkip"] = note.isSkip;
+			value["IsSingle"] = note.isSingle;
+			value["IsConnectedFirst"] = note.isConnectedFirst;
+			value["IsConnectedLast"] = note.isConnectedLast;
+			return value;
+		}
+
+		double roundFloatForJson(float value)
+		{
+			return std::strtod(IO::formatFixedFloatTrimmed(value, 6).c_str(), nullptr);
 		}
 
 		RawNote readNote(const json& js)
@@ -387,6 +607,7 @@ namespace MikuMikuWorld
 
 			Score score{};
 			score.metadata.musicOffset = normalizedOffsetMs;
+			score.metadata.musicId = toInt(root, "MusicId");
 			score.tempoChanges.clear();
 			score.hiSpeedChanges.clear();
 
@@ -455,7 +676,147 @@ namespace MikuMikuWorld
 
 	void CustomScoreJsonSerializer::serialize(const Score& score, std::string filename)
 	{
-		throw std::runtime_error("Exporting ChartMaker JSON is not supported.");
+		using namespace custom_score_json;
+
+		std::vector<ExportEvent> events;
+		events.reserve(1 + score.timeSignatures.size() + score.tempoChanges.size() + score.hiSpeedChanges.size());
+
+		int nextEventId = 1;
+		events.push_back({ nextEventId++, 1, 0, 1.0f });
+
+		if (score.timeSignatures.empty())
+		{
+			events.push_back({ nextEventId++, 3, 0, "4/4" });
+		}
+		else
+		{
+			for (const auto& [measure, signature] : score.timeSignatures)
+			{
+				const int ticks = measureToTicks(measure, TICKS_PER_BEAT, score.timeSignatures);
+				events.push_back({
+					nextEventId++,
+					3,
+					ticks,
+					IO::formatString("%d/%d", signature.numerator, signature.denominator)
+				});
+			}
+		}
+
+		if (score.tempoChanges.empty())
+		{
+			events.push_back({ nextEventId++, 0, 0, 160.0f });
+		}
+		else
+		{
+			for (const auto& tempo : score.tempoChanges)
+				events.push_back({ nextEventId++, 0, tempo.tick, roundFloatForJson(tempo.bpm) });
+		}
+
+		if (score.hiSpeedChanges.empty())
+		{
+			events.push_back({ nextEventId++, 2, 0, 1.0f });
+		}
+		else
+		{
+			for (const auto& hiSpeed : score.hiSpeedChanges)
+				events.push_back({ nextEventId++, 2, hiSpeed.tick, roundFloatForJson(hiSpeed.speed) });
+		}
+
+		std::vector<ExportNote> notes;
+		notes.reserve(score.notes.size());
+		int nextNoteId = 1;
+
+		for (const auto& [_, note] : score.notes)
+		{
+			if (note.getType() != NoteType::Tap)
+				continue;
+
+			notes.push_back(makeTapExportNote(note, nextNoteId++));
+		}
+
+		for (const auto& [_, hold] : score.holdNotes)
+		{
+			const Note& start = score.notes.at(hold.start.ID);
+			const Note& end = score.notes.at(hold.end);
+			const bool isGuide = hold.isGuide();
+			const size_t chainSize = hold.steps.size() + 2;
+			std::vector<int> ids(chainSize);
+			for (int& id : ids)
+				id = nextNoteId++;
+
+			notes.push_back(makeChainEndpointExportNote(
+				start,
+				hold.startType,
+				true,
+				ids.front(),
+				-1,
+				chainSize > 1 ? ids[1] : -1,
+				hold.start.ease
+			));
+
+			for (size_t index = 0; index < hold.steps.size(); ++index)
+			{
+				const HoldStep& step = hold.steps[index];
+				const Note& stepNote = score.notes.at(step.ID);
+				notes.push_back(makeChainMidExportNote(
+					stepNote,
+					step,
+					isGuide,
+					ids[index + 1],
+					ids[index],
+					ids[index + 2]
+				));
+			}
+
+			notes.push_back(makeChainEndpointExportNote(
+				end,
+				hold.endType,
+				false,
+				ids.back(),
+				ids[ids.size() - 2],
+				-1,
+				EaseType::Linear
+			));
+		}
+
+		std::stable_sort(notes.begin(), notes.end(), [](const ExportNote& left, const ExportNote& right)
+		{
+			if (left.ticks != right.ticks)
+				return left.ticks < right.ticks;
+
+			if (left.laneStart != right.laneStart)
+				return left.laneStart < right.laneStart;
+
+			return left.id < right.id;
+		});
+
+		int maxTick = 0;
+		for (const auto& event : events)
+			maxTick = std::max(maxTick, event.ticks);
+		for (const auto& note : notes)
+			maxTick = std::max(maxTick, note.ticks);
+
+		ordered_json root{
+			{ "$id", "1" },
+			{ "VersionCode", 10000 },
+			{ "MusicScoreEventDataList", ordered_json::array() },
+			{ "EventArray", ordered_json::array() },
+			{ "NoteList", ordered_json::array() },
+			{ "MusicScoreTicksMax", maxTick },
+			{ "MusicId", score.metadata.musicId },
+			{ "FullComboDataHash", nullptr }
+		};
+
+		int nextJsonId = 2;
+		for (const auto& event : events)
+			root["MusicScoreEventDataList"].push_back(toEventJson(event, nextJsonId++));
+		for (const auto& note : notes)
+			root["NoteList"].push_back(toNoteJson(note, nextJsonId++));
+
+		IO::File file(filename, IO::FileMode::Write);
+		file.write(root.dump(2));
+		file.flush();
+		file.close();
 	}
 
 	Score CustomScoreJsonSerializer::deserialize(std::string filename)

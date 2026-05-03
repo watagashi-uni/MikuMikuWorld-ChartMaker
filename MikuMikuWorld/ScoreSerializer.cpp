@@ -19,10 +19,13 @@ namespace MikuMikuWorld
 		{
 			return SerializeFormat::SusFormat;
 		}
-		else if (hasExtension(filename, JSON_EXTENSION) ||
-		         hasExtension(filename, GZ_JSON_EXTENSION))
+		else if (hasExtension(filename, GZ_JSON_EXTENSION))
 		{
 			return SerializeFormat::LvlDataFormat;
+		}
+		else if (hasExtension(filename, JSON_EXTENSION))
+		{
+			return SerializeFormat::CustomScoreJsonFormat;
 		}
 		return SerializeFormat::FormatCount;
 	}
@@ -42,6 +45,8 @@ namespace MikuMikuWorld
 			return IO::mmwsFilter;
 		case SerializeFormat::SusFormat:
 			return IO::susFilter;
+		case SerializeFormat::CustomScoreJsonFormat:
+			return IO::customScoreJsonFilter;
 		case SerializeFormat::LvlDataFormat:
 			return IO::lvlDatFilter;
 		default:
@@ -57,6 +62,8 @@ namespace MikuMikuWorld
 			return "unchmmws";
 		case SerializeFormat::SusFormat:
 			return "sus";
+		case SerializeFormat::CustomScoreJsonFormat:
+			return "json";
 		case SerializeFormat::LvlDataFormat:
 			return "json.gz";
 		default:

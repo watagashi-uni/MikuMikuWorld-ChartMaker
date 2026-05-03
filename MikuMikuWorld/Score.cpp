@@ -8,6 +8,7 @@ namespace MikuMikuWorld
 		metadata.author = "";
 		metadata.artist = "";
 		metadata.musicOffset = 0;
+		metadata.musicId = 0;
 
 		tempoChanges.push_back(Tempo());
 		timeSignatures[0] = { 0, 4, 4 };

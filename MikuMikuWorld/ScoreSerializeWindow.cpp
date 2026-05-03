@@ -19,6 +19,7 @@ namespace MikuMikuWorld
 	static const std::array<std::string, FORMAT_COUNT> FORMAT_NAMES = {
 		IO::formatString("%s (%s)", IO::mmwsFilter.filterName.c_str(), MMWS_EXTENSION),
 		IO::formatString("%s (%s)", IO::susFilter.filterName.c_str(), SUS_EXTENSION),
+		IO::formatString("%s (%s)", IO::customScoreJsonFilter.filterName.c_str(), JSON_EXTENSION),
 		IO::lvlDatFilter.filterName,
 	};
 
@@ -65,6 +66,9 @@ namespace MikuMikuWorld
 			break;
 		case SerializeFormat::SusFormat:
 			serializer = std::make_unique<SusSerializer>();
+			break;
+		case SerializeFormat::CustomScoreJsonFormat:
+			serializer = std::make_unique<CustomScoreJsonSerializer>();
 			break;
 		case SerializeFormat::LvlDataFormat:
 			serializer = std::make_unique<SonolusSerializer>(std::make_unique<PySekaiEngine>(), IO::endsWith(filename, GZ_JSON_EXTENSION));
@@ -199,6 +203,7 @@ namespace MikuMikuWorld
 		case SerializeFormat::SusFormat:
 			deserializer = std::make_unique<SusSerializer>();
 			break;
+		case SerializeFormat::CustomScoreJsonFormat:
 		case SerializeFormat::LvlDataFormat:
 			deserializer = std::make_unique<CustomScoreJsonSerializer>();
 			break;

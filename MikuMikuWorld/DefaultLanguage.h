@@ -170,6 +170,7 @@ namespace MikuMikuWorld
 		{"title", "Title"},
 		{"designer", "Designer"},
 		{"artist", "Artist"},
+		{"music_id", "Music ID"},
 		{"jacket", "Jacket"},
 		{"audio", "Audio"},
 		{"music_file", "Music File"},
