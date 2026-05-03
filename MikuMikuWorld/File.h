@@ -115,6 +115,7 @@ namespace IO
 	extern FileDialogFilter mmwsFilter;
 	extern FileDialogFilter susFilter;
 	extern FileDialogFilter lvlDatFilter;
+	extern FileDialogFilter customScoreJsonFilter;
 	extern FileDialogFilter imageFilter;
 	extern FileDialogFilter audioFilter;
 	extern FileDialogFilter presetFilter;

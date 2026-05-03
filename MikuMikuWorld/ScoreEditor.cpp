@@ -344,10 +344,10 @@ namespace MikuMikuWorld
 		fileDialog.parentWindowHandle = Application::windowState.windowHandle;
 		fileDialog.title = "Open Chart";
 		fileDialog.filters = {
-			IO::combineFilters("All Supported Files",{ IO::mmwsFilter, IO::susFilter }),
+			IO::combineFilters("All Supported Files",{ IO::mmwsFilter, IO::susFilter, IO::customScoreJsonFilter }),
 			IO::mmwsFilter,
 			IO::susFilter,
-			// IO::lvlDatFilter, // Temporarily disable openning lvldata format
+			IO::customScoreJsonFilter,
 			IO::allFilter
 		};
 		

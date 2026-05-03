@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "ScoreSerializeWindow.h"
 
+#include "CustomScoreJsonSerializer.h"
 #include "NativeScoreSerializer.h"
 #include "SusSerializer.h"
 #include "SonolusSerializer.h"
@@ -199,7 +200,7 @@ namespace MikuMikuWorld
 			deserializer = std::make_unique<SusSerializer>();
 			break;
 		case SerializeFormat::LvlDataFormat:
-			deserializer = std::make_unique<SonolusSerializer>(std::make_unique<PySekaiEngine>());
+			deserializer = std::make_unique<CustomScoreJsonSerializer>();
 			break;
 		default:
 			deserializer.reset();
