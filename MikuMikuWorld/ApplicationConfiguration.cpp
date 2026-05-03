@@ -30,7 +30,7 @@ namespace MikuMikuWorld
 		configFile.close();
 
 		version = jsonIO::tryGetValue<std::string>(config, "version", "1.0");
-		language = jsonIO::tryGetValue<std::string>(config, "language", "auto");
+		language = jsonIO::tryGetValue<std::string>(config, "language", "zh-cn");
 		debugEnabled = jsonIO::tryGetValue<bool>(config, "debug", false);
 
 		if (jsonIO::keyExists(config, "window"))
@@ -274,7 +274,7 @@ namespace MikuMikuWorld
 		hideStartupWarning = false;
 		accentColor = 1;
 		userColor = Color(0.2f, 0.2f, 0.2f, 1.0f);
-		language = "auto";
+		language = "zh-cn";
 
 		timelineWidth = 26;
 		notesHeight = 26;

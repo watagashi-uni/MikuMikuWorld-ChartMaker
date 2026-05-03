@@ -138,6 +138,8 @@ guide, 輔助
 bpm, BPM
 time_signature, 時間戳
 none, 無
+follow_cursor, 跟隨游標
+up, 上
 default, 預設
 left, 左
 right, 右
@@ -162,10 +164,12 @@ step_type, 中繼點類型
 ease_type, 緩動類型
 flick_type, Flick 類型
 hold_type, Hold 類型
+note_speed_ratio, 速度倍率
 metadata, 資訊
 title, 標題
 designer, 譜師
 artist, 演奏者
+music_id, 音樂 ID
 jacket, 封面
 audio, 音訊
 music_file, 音訊檔案
@@ -195,9 +199,9 @@ measure, 小節
 skill, 技能
 increase_note_size, 加寬音符
 decrease_note_size, 減小音符
-hi_speed, 加速
-edit_hi_speed, 編輯加速度
-hi_speed_speed, 加速速度
+hi_speed, 高速
+edit_hi_speed, 編輯高速
+hi_speed_speed, 高速倍率
 edit_skill, 編輯技能
 edit_fever, 編輯FEVER
 edit_none, 編輯
@@ -236,6 +240,6 @@ timeline_trace, 時間軸「軌道」
 timeline_guide, 時間軸「輔助」
 timeline_bpm, 時間軸「BPM」
 timeline_time_signature, 時間軸「拍子」
-timeline_hi_speed, 時間軸「加速」
+timeline_hi_speed, 時間軸「高速」
 zoom_in, 縮小
 zoom_out, 放大

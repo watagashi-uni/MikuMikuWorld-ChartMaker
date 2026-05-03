@@ -6,7 +6,9 @@
 #ifdef _WIN32
 #include <Windows.h>
 #endif
+#include <algorithm>
 #include <clocale>
+#include <cctype>
 #include <cstdlib>
 #include <ctime>
 
@@ -25,15 +27,19 @@ namespace MikuMikuWorld
 
 	std::string Utilities::getSystemLocale()
 	{
+		std::string value;
+
 #ifdef _WIN32
 		LPWSTR lpLocalName = new WCHAR[LOCALE_NAME_MAX_LENGTH];
 		int result = GetUserDefaultLocaleName(lpLocalName, LOCALE_NAME_MAX_LENGTH);
+		if (result <= 0)
+		{
+			delete[] lpLocalName;
+			return "en";
+		}
 
-		std::wstring wL = lpLocalName;
-		wL = wL.substr(0, wL.find_first_of(L"-"));
-
+		value = IO::wideStringToMb(lpLocalName);
 		delete[] lpLocalName;
-		return IO::wideStringToMb(wL);
 #else
 		const char* locale = std::setlocale(LC_CTYPE, "");
 		if (!locale || !*locale)
@@ -41,12 +47,20 @@ namespace MikuMikuWorld
 		if (!locale || !*locale)
 			return "en";
 
-		std::string value = locale;
-		size_t end = value.find_first_of("_-.");
+		value = locale;
+#endif
+
+		size_t end = value.find_first_of(".@");
 		if (end != std::string::npos)
 			value = value.substr(0, end);
+
+		std::replace(value.begin(), value.end(), '_', '-');
+		std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch)
+		{
+			return (char)std::tolower(ch);
+		});
+
 		return value.empty() ? "en" : value;
-#endif
 	}
 
 	std::string Utilities::getDivisionString(int div)
