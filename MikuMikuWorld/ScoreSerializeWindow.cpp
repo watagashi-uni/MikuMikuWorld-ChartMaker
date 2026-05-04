@@ -11,6 +11,8 @@
 #include "ApplicationConfiguration.h"
 #include "Colors.h"
 #include "ScoreEditor.h"
+#include <algorithm>
+#include <cmath>
 
 namespace MikuMikuWorld
 {
@@ -41,6 +43,14 @@ namespace MikuMikuWorld
 		createSerializer();
 	}
 
+	bool DefaultScoreSerializeController::hasUnsupportedSusNoteSpeed(const Score& score)
+	{
+		return std::any_of(score.notes.begin(), score.notes.end(), [](const auto& item)
+		{
+			return std::abs(item.second.speedRatio - 1.0f) > 0.0001f;
+		});
+	}
+
     bool DefaultScoreSerializeController::openFileDialog(SerializeFormat format, std::string &filename)
 	{
         IO::FileDialog fileDialog{};
@@ -60,6 +70,14 @@ namespace MikuMikuWorld
 
 	void DefaultScoreSerializeController::createSerializer() {
 		SerializeFormat format = toSerializeFormat(filename);
+		if (format == SerializeFormat::SusFormat && !susNoteSpeedWarningAcknowledged && hasUnsupportedSusNoteSpeed(score))
+		{
+			pendingSusNoteSpeedWarning = true;
+			serializer.reset();
+			return;
+		}
+
+		pendingSusNoteSpeedWarning = false;
 		switch (format) {
 		case SerializeFormat::NativeFormat:
 			serializer = std::make_unique<NativeScoreSerializer>();
@@ -85,6 +103,44 @@ namespace MikuMikuWorld
 
 	SerializeResult DefaultScoreSerializeController::update()
 	{
+		if (pendingSusNoteSpeedWarning)
+		{
+			if (!ImGui::IsPopupOpen("###sus_notespeed_warning"))
+				ImGui::OpenPopup("###sus_notespeed_warning");
+
+			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+			ImGui::SetNextWindowSizeConstraints({ 360, 150 }, { FLT_MAX, FLT_MAX });
+			ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+			if (ImGui::BeginPopupModal(APP_NAME "###sus_notespeed_warning", NULL, ImGuiWindowFlags_NoResize))
+			{
+				const ImGuiStyle& style = ImGui::GetStyle();
+				ImGui::TextWrapped("%s", getString("sus_notespeed_export_warning"));
+				ImVec2 avail = ImGui::GetContentRegionAvail();
+				const float btnWidth = avail.x / 2 - style.ItemSpacing.x * 2;
+				const float btnHeight = ImGui::GetFrameHeight();
+
+				if (ImGui::Button(getString("export_anyway"), { btnWidth, btnHeight }))
+				{
+					susNoteSpeedWarningAcknowledged = true;
+					pendingSusNoteSpeedWarning = false;
+					createSerializer();
+					ImGui::CloseCurrentPopup();
+				}
+
+				ImGui::SameLine(0, style.ItemSpacing.x * 2);
+				if (ImGui::Button(getString("cancel"), { btnWidth, btnHeight }))
+				{
+					pendingSusNoteSpeedWarning = false;
+					filename.clear();
+					ImGui::CloseCurrentPopup();
+				}
+
+				ImGui::EndPopup();
+			}
+
+			return SerializeResult::None;
+		}
+
 		if (serializer && !filename.empty())
 		{
 			try

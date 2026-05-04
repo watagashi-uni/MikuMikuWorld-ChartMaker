@@ -52,8 +52,10 @@ startup_warning_hide, 不再显示此警告
 startup_warning_confirm, 我已了解
 score_file, 谱面文件
 export_successful, 导出成功
+export_anyway, 仍然导出
 unknown_file_format, 未知文件格式
 open_as_file_format, 以哪种格式打开？
+sus_notespeed_export_warning, 当前谱面包含 Notes Speed。SUS 不支持单个 note 的 Notes Speed，导出后这些值会丢失。是否继续？
 error, 错误
 error_reason, 错误原因
 error_open_file_msg1, 文件
