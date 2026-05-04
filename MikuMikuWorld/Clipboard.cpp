@@ -1,14 +1,15 @@
 #include "Clipboard.h"
 #include "ImGui/imgui.h"
 #include "IO.h"
-#include <map>
+#include <unordered_map>
+#include <string_view>
 
 namespace MikuMikuWorld
 {
 	static constexpr const char* clipboardSignatureLF = "MikuMikuWorld clipboard\n";
 	static constexpr const char* clipboardSignatureCRLF = "MikuMikuWorld clipboard\r\n";
 
-	static std::map<const char*, EaseType> stringToEaseTypeMap =
+	static const std::unordered_map<std::string_view, EaseType> stringToEaseTypeMap =
 	{
 		{"linear", EaseType::Linear},
 		{"ease_in", EaseType::EaseIn},
@@ -17,7 +18,7 @@ namespace MikuMikuWorld
 		{"out", EaseType::EaseOut}
 	};
 
-	static std::map<const char*, HoldStepType> stringToHoldStepTypeMap =
+	static const std::unordered_map<std::string_view, HoldStepType> stringToHoldStepTypeMap =
 	{
 		{"normal", HoldStepType::Normal},
 		{"hidden", HoldStepType::Hidden},
@@ -47,6 +48,9 @@ namespace MikuMikuWorld
 
 	EaseType Clipboard::stringToEaseType(const char* str, EaseType def)
 	{
+		if (str == nullptr)
+			return def;
+
 		auto it = stringToEaseTypeMap.find(str);
 		if (it == stringToEaseTypeMap.end())
 			return def;
@@ -56,6 +60,9 @@ namespace MikuMikuWorld
 
 	HoldStepType Clipboard::stringToHoldStepType(const char* str, HoldStepType def)
 	{
+		if (str == nullptr)
+			return def;
+
 		auto it = stringToHoldStepTypeMap.find(str);
 		if (it == stringToHoldStepTypeMap.end())
 			return def;
