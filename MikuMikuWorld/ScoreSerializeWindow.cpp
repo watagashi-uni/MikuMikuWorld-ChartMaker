@@ -108,18 +108,31 @@ namespace MikuMikuWorld
 			if (!ImGui::IsPopupOpen("###sus_notespeed_warning"))
 				ImGui::OpenPopup("###sus_notespeed_warning");
 
-			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-			ImGui::SetNextWindowSizeConstraints({ 360, 150 }, { FLT_MAX, FLT_MAX });
-			ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+			const ImGuiViewport* viewport = ImGui::GetMainViewport();
+			const ImGuiStyle& style = ImGui::GetStyle();
+			const char* warningText = getString("sus_notespeed_export_warning");
+			const float popupWidth = std::clamp(viewport->WorkSize.x * 0.42f, 360.0f, 520.0f);
+			const float contentWidth = popupWidth - (style.WindowPadding.x * 2.0f);
+			const float buttonHeight = ImGui::GetFrameHeight();
+			const float titleBarHeight = ImGui::GetFontSize() + (style.FramePadding.y * 2.0f);
+			const float messageHeight = ImGui::CalcTextSize(warningText, nullptr, false, contentWidth).y;
+			const float popupHeight =
+				titleBarHeight +
+				(style.WindowPadding.y * 2.0f) +
+				messageHeight +
+				style.ItemSpacing.y +
+				buttonHeight;
+
+			ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+			ImGui::SetNextWindowSize({ popupWidth, popupHeight }, ImGuiCond_Always);
+			ImGui::SetNextWindowViewport(viewport->ID);
 			if (ImGui::BeginPopupModal(APP_NAME "###sus_notespeed_warning", NULL, ImGuiWindowFlags_NoResize))
 			{
-				const ImGuiStyle& style = ImGui::GetStyle();
-				ImGui::TextWrapped("%s", getString("sus_notespeed_export_warning"));
+				ImGui::TextWrapped("%s", warningText);
 				ImVec2 avail = ImGui::GetContentRegionAvail();
 				const float btnWidth = avail.x / 2 - style.ItemSpacing.x * 2;
-				const float btnHeight = ImGui::GetFrameHeight();
 
-				if (ImGui::Button(getString("export_anyway"), { btnWidth, btnHeight }))
+				if (ImGui::Button(getString("export_anyway"), { btnWidth, buttonHeight }))
 				{
 					susNoteSpeedWarningAcknowledged = true;
 					pendingSusNoteSpeedWarning = false;
@@ -128,7 +141,7 @@ namespace MikuMikuWorld
 				}
 
 				ImGui::SameLine(0, style.ItemSpacing.x * 2);
-				if (ImGui::Button(getString("cancel"), { btnWidth, btnHeight }))
+				if (ImGui::Button(getString("cancel"), { btnWidth, buttonHeight }))
 				{
 					pendingSusNoteSpeedWarning = false;
 					filename.clear();
