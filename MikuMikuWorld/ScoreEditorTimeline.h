@@ -246,6 +246,7 @@ namespace MikuMikuWorld
 		{
 			EventType type = EventType::None;
 			int editIndex = -1;
+			int editTick = -1;
 
 			float editBpm = 120.0f;
 			int editTimeSignatureNumerator = 4;

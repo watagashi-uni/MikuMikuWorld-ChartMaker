@@ -158,7 +158,15 @@ namespace MikuMikuWorld
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.0f);
 		ImGui::BeginDisabled(!enabled);
 		ImGui::SetCursorScreenPos({posX, posY});
-		bool activated = ImGui::Button(IO::formatString("##%s###%.f|%.f", txt, posX, posY).c_str(), itemSize);
+		ImGui::PushID(tick);
+		ImGui::PushID(fromStart ? 1 : 0);
+		ImGui::PushID(enabled ? 1 : 0);
+		ImGui::PushID(txt);
+		bool activated = ImGui::Button("##event_control", itemSize);
+		ImGui::PopID();
+		ImGui::PopID();
+		ImGui::PopID();
+		ImGui::PopID();
 		ImGui::EndDisabled();
 		ImGui::PopStyleVar();
 		ImGui::PopStyleColor(3);
@@ -765,6 +773,7 @@ namespace MikuMikuWorld
 				if (hiSpeedControl(context, hiSpeed))
 				{
 					eventEdit.editIndex = index;
+					eventEdit.editTick = hiSpeed.tick;
 					eventEdit.setEditHispeed(hiSpeed.speed);
 					eventEdit.type = EventType::HiSpeed;
 					ImGui::OpenPopup("edit_event");
@@ -2211,6 +2220,13 @@ namespace MikuMikuWorld
 
 	bool ScoreEditorTimeline::hiSpeedControl(ScoreContext& context, int tick, float speed, bool enabled)
 	{
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 1, 0 });
+		const float frameHeight = ImGui::GetFrameHeightWithSpacing();
+		ImGui::PopStyleVar();
+		const float posY = floorf(position.y - tickToPosition(tick) + visualOffset - frameHeight);
+		if (posY + frameHeight < boundaries.Min.y || posY > boundaries.Max.y)
+			return false;
+
 		std::string txt = IO::formatString("%sx", IO::formatFixedFloatTrimmed(speed));
 		eventControl(tick, speedColor, txt.c_str(), false, enabled, selectedHiSpeedTicks.find(tick) != selectedHiSpeedTicks.end() && !playing);
 		const ImVec2 rectMin = ImGui::GetItemRectMin();
@@ -2343,7 +2359,12 @@ namespace MikuMikuWorld
 			}
 			else if (eventEdit.type == EventType::HiSpeed)
 			{
-				if (!isArrayIndexInBounds(eventEdit.editIndex, context.score.hiSpeedChanges))
+				auto hiSpeedIt = std::find_if(context.score.hiSpeedChanges.begin(), context.score.hiSpeedChanges.end(),
+					[this](const HiSpeedChange& hiSpeed)
+					{
+						return hiSpeed.tick == eventEdit.editTick;
+					});
+				if (hiSpeedIt == context.score.hiSpeedChanges.end())
 				{
 					ImGui::CloseCurrentPopup();
 					ImGui::EndPopup();
@@ -2354,8 +2375,9 @@ namespace MikuMikuWorld
 				label = getString("hi_speed_speed");
 				if (appearing)
 					ImGui::SetColumnWidth(0, ImGui::CalcTextSize(label).x + ImGui::GetCursorPosX() + style.ItemSpacing.x);
+				ImGui::PushID(eventEdit.editTick);
 				UI::addNumericStringProperty(label, eventEdit.editHiSpeed);
-				HiSpeedChange& hiSpeed = context.score.hiSpeedChanges[eventEdit.editIndex];
+				HiSpeedChange& hiSpeed = *hiSpeedIt;
 				if (ImGui::IsItemDeactivatedAfterEdit())
 				{
 					Score prev = context.score;
@@ -2372,6 +2394,7 @@ namespace MikuMikuWorld
 
 					context.pushHistory("Change hi-speed", prev, context.score);
 				}
+				ImGui::PopID();
 				UI::endPropertyColumns();
 
 				ImGui::Separator();
@@ -2380,7 +2403,7 @@ namespace MikuMikuWorld
 					ImGui::CloseCurrentPopup();
 					Score prev = context.score;
 					selectedHiSpeedTicks.erase(hiSpeed.tick);
-					context.score.hiSpeedChanges.erase(context.score.hiSpeedChanges.begin() + eventEdit.editIndex);
+					context.score.hiSpeedChanges.erase(hiSpeedIt);
 					context.pushHistory("Remove hi-speed change", prev, context.score);
 				}
 			}
