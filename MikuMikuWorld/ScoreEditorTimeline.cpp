@@ -1958,14 +1958,19 @@ namespace MikuMikuWorld
 		{
 			drawNote(start, renderer, tint, offsetTicks, offsetLane);
 		}
-		else if (isDrawSteps)
+		else
 		{
-			drawSteps.push_back({
-				start.tick + offsetTicks,
-				start.lane + offsetLane,
-				start.width,
-				start.critical ? StepDrawType::InvisibleHoldCritical : StepDrawType::InvisibleHold
-			});
+			if (isDrawSteps)
+			{
+				drawSteps.push_back({
+					start.tick + offsetTicks,
+					start.lane + offsetLane,
+					start.width,
+					start.critical ? StepDrawType::InvisibleHoldCritical : StepDrawType::InvisibleHold
+				});
+			}
+
+			drawSpeedRatioLabel(start, offsetTicks, offsetLane);
 		}
 
 		if (note.endType == HoldNoteType::Normal)
