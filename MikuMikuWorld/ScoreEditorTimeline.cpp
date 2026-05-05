@@ -957,7 +957,7 @@ namespace MikuMikuWorld
 
 			float _zoom = zoom;
 			int controlWidth = ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("99:59:59  |  64/64  |  999 BPM  |  10000x").x - (UI::btnSmall.x * 3);
-			if (UI::zoomControl("zoom", _zoom, minZoom, 10, std::clamp(controlWidth, 120, 320)))
+			if (UI::zoomControl("zoom", _zoom, minZoom, sliderMaxZoom, std::clamp(controlWidth, 120, 320)))
 				setZoom(_zoom);
 
 			ImGui::SameLine();

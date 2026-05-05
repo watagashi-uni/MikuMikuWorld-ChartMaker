@@ -94,7 +94,8 @@ namespace MikuMikuWorld
 		static constexpr float unitHeight = 0.15f;
 		static constexpr float scrollUnit = 50;
 		static constexpr float minZoom = 0.25f;
-		static constexpr float maxZoom = 30.0f;
+		static constexpr float sliderMaxZoom = 30.0f;
+		static constexpr float maxZoom = 100.0f;
 		static constexpr double waveformSecondsPerPixel = 0.005;
 		static constexpr float noteControlWidth = 12;
 		static constexpr float eventControlPadding = 10;
