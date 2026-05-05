@@ -28,12 +28,6 @@ namespace MikuMikuWorld
 	DefaultScoreSerializeController::DefaultScoreSerializeController(Score score)
 	{
 		this->score = std::move(score);
-		// Check if user selected a format before, we default to serialize it
-		// If they cancel, continue as normal and ask for a new format
-		if (static_cast<int>(SerializeFormat::SusFormat) <= config.lastSelectedExportIndex
-			&& config.lastSelectedExportIndex < static_cast<int>(SerializeFormat::FormatCount)
-			&& openFileDialog(static_cast<SerializeFormat>(config.lastSelectedExportIndex), this->filename))
-				createSerializer();
 	}
 
 	DefaultScoreSerializeController::DefaultScoreSerializeController(Score score, const std::string& filename)
@@ -231,7 +225,6 @@ namespace MikuMikuWorld
 					{
 						createSerializer();
 						ImGui::CloseCurrentPopup();
-						config.lastSelectedExportIndex = static_cast<int>(selectedFormat);
 					}
 				}
 				ImGui::EndDisabled();
@@ -240,7 +233,6 @@ namespace MikuMikuWorld
 				{
 					ImGui::CloseCurrentPopup();
 					result = SerializeResult::Cancel;
-					config.lastSelectedExportIndex = 0;
 				}
 				ImGui::EndPopup();
 			}

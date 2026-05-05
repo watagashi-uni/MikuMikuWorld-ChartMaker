@@ -105,7 +105,6 @@ namespace MikuMikuWorld
 		float bgmVolume;
 		float seVolume;
 		int seProfileIndex;
-		int lastSelectedExportIndex;
 		bool debugEnabled;
 		bool pvMirrorScore;
 		bool pvFlickAnimation;
