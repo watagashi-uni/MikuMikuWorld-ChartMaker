@@ -48,7 +48,7 @@ namespace MikuMikuWorld
 				continue;
 
 			const float speed = jsonIO::tryGetValue<float>(entry, "speed", 1.0f);
-			if (!std::isfinite(speed) || speed <= 0.0f)
+			if (!std::isfinite(speed))
 				continue;
 
 			hiSpeeds.push_back({ std::max(0, jsonIO::tryGetValue<int>(entry, "tick", 0)), speed });
