@@ -48,7 +48,11 @@ namespace MikuMikuWorld
 				return;
 
 			std::error_code error;
+#ifdef _WIN32
+			std::filesystem::create_directories(IO::mbToWideStr(path), error);
+#else
 			std::filesystem::create_directories(path, error);
+#endif
 		}
 	}
 
@@ -111,20 +115,19 @@ namespace MikuMikuWorld
 	std::string Application::getVersion()
 	{
 #ifdef _WIN32
-		wchar_t filename[1024];
-		lstrcpyW(filename, IO::mbToWideStr(std::string(appDir + "MikuMikuWorld.exe")).c_str());
+		std::wstring filename = IO::mbToWideStr(appDir + "MikuMikuWorld.exe");
 
 		DWORD  verHandle = 0;
 		UINT   size = 0;
 		LPBYTE lpBuffer = NULL;
-		DWORD  verSize = GetFileVersionInfoSizeW(filename, &verHandle);
+		DWORD  verSize = GetFileVersionInfoSizeW(filename.c_str(), &verHandle);
 
 		int major = 0, minor = 0, build = 0, rev = 0;
 		if (verSize != NULL)
 		{
 			LPSTR verData = new char[verSize];
 
-			if (GetFileVersionInfoW(filename, verHandle, verSize, verData))
+			if (GetFileVersionInfoW(filename.c_str(), verHandle, verSize, verData))
 			{
 				if (VerQueryValue(verData, TEXT("\\"), (VOID FAR * FAR*) & lpBuffer, &size))
 				{

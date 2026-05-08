@@ -120,7 +120,9 @@ int main()
 	for (int i = 1; i < argc; ++i)
 		openFiles.push_back(IO::wideStringToMb(args[i]));
 
-	return runApplication(argc, IO::wideStringToMb(args[0]), openFiles);
+	const int result = runApplication(argc, IO::wideStringToMb(args[0]), openFiles);
+	LocalFree(args);
+	return result;
 }
 
 LRESULT CALLBACK wndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -166,7 +168,7 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case WM_SETTINGCHANGE:
-		if (lParam != 0 && lstrcmp((LPCSTR)lParam, "ImmersiveColorSet"))
+		if (lParam != 0 && lstrcmpW(reinterpret_cast<LPCWSTR>(lParam), L"ImmersiveColorSet") == 0)
 		{
 			mmw::UI::setDarkMode(mmw::UI::isSystemDarkMode());
 		}

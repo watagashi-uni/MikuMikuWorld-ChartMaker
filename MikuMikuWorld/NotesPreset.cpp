@@ -13,6 +13,33 @@ namespace fs = std::filesystem;
 
 namespace MikuMikuWorld
 {
+	namespace
+	{
+		fs::path pathFromUtf8(const std::string& path)
+		{
+#ifdef _WIN32
+			return fs::path{ IO::mbToWideStr(path) };
+#else
+			return fs::path{ path };
+#endif
+		}
+
+		std::string pathToUtf8(const fs::path& path)
+		{
+#ifdef _WIN32
+			return IO::wideStringToMb(path.wstring());
+#else
+			return path.string();
+#endif
+		}
+
+		fs::path withJsonExtension(fs::path path)
+		{
+			path.replace_extension(".json");
+			return path;
+		}
+	}
+
 	NotesPreset::NotesPreset(int _id, std::string _name) :
 		ID{ _id }, name{ _name }
 	{
@@ -50,7 +77,7 @@ namespace MikuMikuWorld
 
 	Result NotesPreset::read(const std::string& filepath)
 	{
-		fs::path path{IO::mbToWideStr(filepath)};
+		fs::path path = pathFromUtf8(filepath);
 		if (!fs::exists(path))
 			return Result(ResultStatus::Error, "The preset file \"" + filepath + "\" does not exist.");
 
@@ -86,28 +113,34 @@ namespace MikuMikuWorld
 
 	void NotesPreset::write(fs::path filepath, bool overwrite)
 	{
-		std::wstring wFilename = IO::File::getFullFilenameWithoutExtension(filepath.wstring());
+		fs::path outputFilename = filepath;
+		outputFilename.replace_extension();
+		fs::path outputPath = withJsonExtension(outputFilename);
 		if (!overwrite)
 		{
 			int count = 1;
-			std::wstring suffix = L"";
-
-			while (fs::exists(wFilename + suffix + L".json"))
-				suffix = L"(" + std::to_wstring(count++) + L")";
-
-			wFilename += suffix;
+			while (fs::exists(outputPath))
+			{
+				fs::path candidate = outputFilename;
+#ifdef _WIN32
+				candidate += L"(" + std::to_wstring(count++) + L")";
+#else
+				candidate += "(" + std::to_string(count++) + ")";
+#endif
+				outputPath = withJsonExtension(candidate);
+			}
 		}
 
 		data["name"] = name;
 		data["description"] = description;
 		
-		std::ofstream file(fs::path(wFilename).replace_extension(L".json"));
+		std::ofstream file(outputPath);
 		file.exceptions(std::ios::badbit | std::ios::failbit);
 		file << std::setw(2) << data;
 		file.flush();
 		file.close();
 
-		filename = IO::File::getFilename(IO::wideStringToMb(wFilename));
+		filename = IO::File::getFilename(pathToUtf8(outputPath));
 	}
 
 	IO::MessageBoxResult PresetManager::showErrorMessage(const std::string& message)
@@ -202,7 +235,7 @@ namespace MikuMikuWorld
 
 	Result PresetManager::importPreset(const std::string& path)
 	{
-		fs::path importPath{IO::mbToWideStr(path)};
+		fs::path importPath = pathFromUtf8(path);
 		if (!fs::exists(importPath))
 			return Result(ResultStatus::Error, IO::formatString("Error: File '%s' not found", path));
 		
@@ -213,12 +246,11 @@ namespace MikuMikuWorld
 		if (result.getStatus() == ResultStatus::Error)
 			return result;
 		
-		fs::path dir{IO::File::getFilepath(path)};
+		fs::path dir = importPath.parent_path();
 		if (dir != presetsPath)
 		{
 			try
 			{
-				std::wstring wFilename{ IO::mbToWideStr(IO::File::getFilenameWithoutExtension(path)) };
 				if (!savePreset(preset))
 				{
 					return Result(
